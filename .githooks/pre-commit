@@ -1,0 +1,28 @@
+#!/bin/sh
+# Blocks commits that could leak confidential survey data.
+# Enable once per clone:  git config core.hooksPath .githooks
+# (Bypass only if you are 100% sure: git commit --no-verify)
+
+fail=0
+staged=$(git diff --cached --name-only --diff-filter=ACMR)
+
+for f in $staged; do
+  case "$f" in
+    data/README.md|outputs/.gitkeep) ;;
+    data/*|outputs/*)
+      echo "BLOCKED: $f is in data/ or outputs/ (confidential / generated)."; fail=1 ;;
+    *.xlsx|*.xls|*.csv|*.parquet|*.pkl|*.sav|*.dta)
+      echo "BLOCKED: $f is a data file type."; fail=1 ;;
+    *.ipynb)
+      if git show ":$f" | grep -q '"output_type"'; then
+        echo "BLOCKED: $f has cell outputs (may contain data). Clear All Outputs, save, re-add."; fail=1
+      fi ;;
+  esac
+done
+
+if [ "$fail" -ne 0 ]; then
+  echo ""
+  echo "Commit stopped by .githooks/pre-commit. Unstage with: git restore --staged <file>"
+  exit 1
+fi
+exit 0
