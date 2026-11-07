@@ -1,0 +1,28 @@
+# ---- Confidential survey data: NEVER commit ----
+data/*
+!data/README.md
+*.xlsx
+*.xls
+*.csv
+*.parquet
+*.pkl
+~$*
+
+# ---- Generated outputs (may contain results derived from the data) ----
+outputs/*
+!outputs/.gitkeep
+
+# ---- Secrets ----
+.env
+.env.*
+
+# ---- Python / tooling ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.ipynb_checkpoints/
+.streamlit/secrets.toml
+.DS_Store
+.vscode/
+.idea/
