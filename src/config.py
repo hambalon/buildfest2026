@@ -33,6 +33,18 @@ CALL_988_LIKELY_MIN_0_10 = 7
 # To count them instead, use: {"very agree": 5, "satisfied": 4}
 NONSTANDARD_AGREE_LABELS: dict[str, int] = {}
 
+# Open-text answers like "None" or "N/A" mean "nothing to add / nothing to change".
+# In the two open-text columns they are kept as answers (they count toward n
+# answered and the "Nothing / no changes" theme). In every other column they are
+# still treated as missing (see MISSING_TOKENS).
+TEXT_ANSWER_TOKENS = {"none", "n/a", "na", "not applicable"}
+
+# County spelling variants are merged automatically: case is ignored and a trailing
+# "County"/"Co." or a leading "Condado de" is dropped, so "Montgomery County" and
+# "montgomery" become one group, shown under its most common spelling.
+# For other variants, map lowercase key -> lowercase key, e.g. {"pg": "prince george's"}.
+COUNTY_ALIASES: dict[str, str] = {}
+
 # =========================================================================== #
 # 2. HOW TO READ THE FILE (change only if the survey layout changes)
 # =========================================================================== #
