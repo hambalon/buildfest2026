@@ -45,6 +45,20 @@ TEXT_ANSWER_TOKENS = {"none", "n/a", "na", "not applicable"}
 # For other variants, map lowercase key -> lowercase key, e.g. {"pg": "prince george's"}.
 COUNTY_ALIASES: dict[str, str] = {}
 
+# Audience: a respondent whose role contains any of these words is in the
+# "Students" audience; everyone else with a role is "Adults". Students are ~83%
+# of respondents and respond very differently, so most views can split by audience.
+YOUTH_ROLE_KEYWORDS = ["student", "estudiante"]
+
+# Session scorecard (one "session" = one training date in one county). A session
+# with at least MIN_N responses is flagged for follow-up when ANY of these is true:
+SESSION_ALERT_NPS_BELOW = 0          # Net Promoter Score below 0 (more detractors than promoters)
+SESSION_ALERT_AGREE_BELOW = 85.0     # % agree after training (average of outcome items) below this
+SESSION_ALERT_DELIVERY_BELOW = 80.0  # % agree on delivery items (presenter / organization) below this
+
+# Time trends group training dates by this period: "Q" (quarter) or "M" (month).
+TREND_PERIOD = "Q"
+
 # =========================================================================== #
 # 2. HOW TO READ THE FILE (change only if the survey layout changes)
 # =========================================================================== #

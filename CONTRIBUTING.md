@@ -52,6 +52,13 @@ If `main` moved while you worked: `git checkout main && git pull && git checkout
 If something sensitive gets committed by mistake, **tell the team right away**.
 Don't just delete it in a new commit, because it stays in the git history.
 
+## Before you open a PR
+
+```bash
+python -m pytest -q                 # automated tests on fake data (pip install -r requirements-dev.txt)
+python scripts/verify_pipeline.py   # 0 FAIL on the real file
+```
+
 ## Pre-commit check
 
 The repo ships a guard hook. Turn it on once per clone:

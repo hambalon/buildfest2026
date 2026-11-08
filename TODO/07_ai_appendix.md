@@ -1,5 +1,9 @@
 # Stage 07: AI Appendix → `Team#_AIAppendix.pdf`
 
+> **Status (2026-11-08): DONE (pending theme-validation numbers).** `docs/ai_appendix.md` is final at 1 page.
+> If the team runs the theme validation (stage 04) or used AI tools other than Claude Code, add them
+> to it and to `docs/AI_LOG.md`, then rebuild with `scripts/build_deliverables.py`.
+
 **Starting point (2026-11-07):** log started at [../docs/AI_LOG.md](../docs/AI_LOG.md); appendix
 placeholder at [../docs/ai_appendix.md](../docs/ai_appendix.md).
 **Depends on:** every stage (ongoing). **Read first:** [00_START_HERE.md](00_START_HERE.md)

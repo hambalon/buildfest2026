@@ -157,7 +157,8 @@ def main() -> int:
 
     # ---- 4. Text themes (coverage only) ------------------------------------
     try:
-        for col, t in text_themes.run_all(res).items():
+        for col in res.text_cols:  # the two questions (run_all also has *_by_audience tables)
+            t = text_themes.theme_summary(res.df[col], col)
             unc = float(t.loc[t["theme"] == text_themes.UNCODED, "pct_of_answered"].iloc[0])
             check(f"themes for {col}", unc <= 40 or None,
                   f"{int(t['n_answered'].iloc[0])} answered, {unc:.0f}% uncoded (aim for <=40%)")
@@ -173,11 +174,13 @@ def main() -> int:
         os.environ["DATA_FILE"] = str(path)
         at = AppTest.from_file(str(Path(__file__).resolve().parent.parent / "app.py"), default_timeout=120).run()
         errs = len(at.exception)
-        for grp in ("county", "role", "language"):
-            if at.selectbox:
-                at.selectbox[0].set_value(grp).run()
-                errs += len(at.exception)
-        check("Dashboard renders all tabs/groups", errs == 0, f"{errs} exception(s)")
+        compare = [s for s in at.selectbox if s.label == "Compare by"]
+        for i in range(len(compare[0].options) if compare else 0):  # every grouping
+            [s for s in at.selectbox if s.label == "Compare by"][0].select_index(i)
+            at.run()
+            errs += len(at.exception)
+        check("Dashboard renders all tabs/groups", errs == 0 and len(at.tabs) == 7,
+              f"{errs} exception(s), {len(at.tabs)} tabs")
 
     n_fail = sum(s == "FAIL" for s, *_ in results)
     n_warn = sum(s == "WARN" for s, *_ in results)

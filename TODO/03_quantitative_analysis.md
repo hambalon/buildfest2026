@@ -1,5 +1,12 @@
 # Stage 03: Quantitative Analysis
 
+> **Status (2026-11-08): DONE.** Findings are in `docs/memo.md`. Beyond the tables below, `src/analyze.py`
+> now also has `by_group(res, "audience")` (students vs adults), `county_by_audience`, `group_tests`
+> (all measures, effect sizes, plain-language verdict), quarterly/monthly `trend` (also by audience),
+> `intent_gap`, `session_scorecard`, `quality_checks`, `sensitivity`, plus `subset_988` and `ceiling`.
+> `python -m src.analyze` also writes the shareable `outputs/summary_report.xlsx`.
+> `scripts/crosscheck.py` recomputes 12 headline numbers independently: 12/12 match.
+
 **Starting point (2026-11-07):** code built and runs on the real file. **Results have not been generated
 or reviewed yet.** **Depends on:** 02 (decisions D1–D2 made).
 **Read first:** [00_START_HERE.md](00_START_HERE.md)
