@@ -11,9 +11,10 @@ survey** (the Microsoft Forms export) into the answers program staff need:
   flags trainings for follow-up.
 - **What do participants say?** Themes in the two open-ended questions.
 
-Every number is an aggregate. Any group based on fewer than **10** people is hidden, and no
-individual response is ever shown or exported. A new survey export works with **no code
-changes**: drop it in, or upload it in the dashboard.
+Every number is an aggregate. Any group based on fewer than **10** people is hidden, results
+from 10–29 people are flagged as *thin*, and no individual response is ever shown or exported.
+A new survey export (`.xlsx` or `.csv`) works with **no code changes**: drop it in, or upload
+it in the dashboard.
 
 > **Confidential data:** the survey file never leaves your computer and is never committed
 > to git (see [data/README.md](data/README.md)).
@@ -49,20 +50,29 @@ Tested on Python 3.9 and 3.14 (macOS); runs anywhere Python and a web browser ru
 ## Updating the data
 
 1. In Microsoft Forms, open the survey → **Responses** → **Open results in Excel**, and save
-   the `.xlsx`. Don't edit it: the tool cleans it.
-2. Either save it into `data/` (the newest `.xlsx` there is used), or click **Use a different
-   survey export** in the dashboard sidebar.
+   the `.xlsx` (a `.csv` export works too). Don't edit it: the tool cleans it.
+2. Either save it into `data/` (the newest `.xlsx`/`.csv` there is used), or click **Use a
+   different survey export** in the dashboard sidebar.
 3. Check **Data quality & methods → How the file was read** after each new export. It lists
    which column was recognized as what.
 
-**If the form changes** (a question is reworded, added or removed), detection usually still
-works. If a column is misread, pin it in `src/config.py` → `COLUMN_OVERRIDES`, then run
+**If the form changes,** detection usually still works. The automated tests cover these
+updates: reordered or renamed columns, an extra question, a missing role / date / 988 /
+delivery / open-ended question, text-formatted dates, new counties and roles, a Spanish-only
+file, a tiny file, and a CSV export. If a column is misread, pin it in `src/config.py` → `COLUMN_OVERRIDES`, then run
 `python scripts/verify_pipeline.py` to confirm (0 FAIL). See the troubleshooting table below.
 
 ## Using the dashboard
 
-The **sidebar** has filters (audience, language, county, role, training dates) and
-**Download summary (Excel + CSV)**: privacy-safe tables for grant reports and board updates.
+The **Summary** tab opens with a **guide to every tab** (the question each one answers and
+what you'll find there), and each tab starts with that same one-line purpose. **What the
+data says** is written automatically from the current data and filters. It is grouped
+into *What's working*, *Gaps to act on*, *What to watch* and *Data caveats*, and each
+point carries its numbers, its n and a suggested action.
+
+The **sidebar** has filters (audience, language, county, role, training dates), an upload box
+(`.xlsx` or `.csv`) and **Download summary (Excel + CSV)**: privacy-safe tables for grant
+reports and board updates. Charts work in light and dark mode.
 
 | Tab | Answers | Look for |
 |---|---|---|
@@ -88,7 +98,7 @@ about 15 minutes per month.
 | `python scripts/crosscheck.py` | Recomputes 12 headline numbers with independent code and compares them |
 | `python scripts/validate_themes.py sample` / `score` | Blind human check of the theme coder (see below) |
 | `python scripts/make_fake_data.py` | Creates a FAKE file with the same layout, for demos and testing |
-| `python -m pytest -q` | 21 automated tests on fake data (`pip install -r requirements-dev.txt` first) |
+| `python -m pytest -q` | 31 automated tests on fake data, including 9 data-update scenarios (`pip install -r requirements-dev.txt` first) |
 | `python scripts/build_deliverables.py --team N` | Builds the BuildFest PDFs and artifact zip with checks |
 
 Run them from this folder with the environment active. Add `--file path/to/file.xlsx` to the
@@ -108,6 +118,7 @@ scripts, or set `DATA_FILE=...`, to use a specific file.
 | Setting | Default | Meaning |
 |---|---|---|
 | `MIN_N` | 10 | Small-group privacy threshold |
+| `THIN_N` | 30 | Results from `MIN_N` to `THIN_N − 1` people are shown but flagged *thin* |
 | `CALL_988_LIKELY_MIN_0_10` | 7 | "Likely to call 988" = score of 7 or more |
 | `NONSTANDARD_AGREE_LABELS` | `{}` | Map odd labels (e.g. "Very agree") instead of treating them as missing |
 | `YOUTH_ROLE_KEYWORDS` | student | Which roles count as the Students audience |
@@ -125,6 +136,7 @@ Full definitions and statistical methods: [docs/METHODS.md](docs/METHODS.md).
 | "No survey file found" | Put the `.xlsx` in `data/` or upload it in the sidebar |
 | "This file could not be read" | Use the original Forms export (.xlsx, one sheet). Re-export if it was edited |
 | A chart or group is missing | It has fewer than 10 responses in the current view. Remove a filter |
+| A result says *thin* | It is based on 10–29 people: treat it as indicative, not conclusive |
 | A column looks wrong after a form change | Run `python scripts/verify_pipeline.py`, then set `COLUMN_OVERRIDES` in `src/config.py` |
 | macOS says the launcher "can't be opened" | Right-click `start_dashboard.command` → Open → Open |
 | Port 8501 busy | `streamlit run app.py --server.port 8502` |
@@ -138,7 +150,7 @@ src/config.py               All settings and team decisions
 src/clean.py                Load + clean any export (column detection, scales, dates, counties, audience)
 src/analyze.py              All measures, group tests, trends, intent gap, session scorecard, quality checks, safe export
 src/text_themes.py          Open-ended theme rules + coding
-src/insights.py             Plain-language takeaways for the Summary tab
+src/insights.py             "What the data says": grouped takeaways with n, thin flags and suggested actions
 scripts/                    verify_pipeline, crosscheck, validate_themes, make_fake_data, build_deliverables
 tests/                      Automated tests (fake data only)
 docs/                       METHODS.md, memo.md, ai_appendix.md, AI_LOG.md, deck_outline.md, SUBMISSION_CHECKLIST.md

@@ -25,7 +25,7 @@ import pandas as pd  # noqa: E402
 
 from src import analyze  # noqa: E402
 from src import config as C  # noqa: E402
-from src.clean import find_data_file, load_and_clean  # noqa: E402
+from src.clean import find_data_file, load_and_clean, read_table  # noqa: E402
 
 # Header fragments (lowercase) for each question in the current form.
 KEYS = {
@@ -59,7 +59,7 @@ def find(cols, parts) -> str | None:
 
 
 def independent(path: Path) -> dict[str, float]:
-    raw = pd.read_excel(path, sheet_name=0, dtype=object)
+    raw = read_table(path, path.name)
     cols = {k: find(raw.columns, v) for k, v in KEYS.items()}
     missing = [k for k, v in cols.items() if v is None]
     if missing:

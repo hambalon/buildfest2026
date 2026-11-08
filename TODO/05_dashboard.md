@@ -6,6 +6,11 @@
 > Tested: every control on Python 3.9 and 3.14, real and fake data, 0 exceptions. **Remaining human
 > task:** one visual pass of the final version in light and dark mode (the earlier review covered the
 > previous version).
+>
+> **Update (2026-11-08):** chart value labels now follow the light/dark theme; the Summary tab opens
+> with a guide to every tab, and each tab starts with its purpose; "What the data says" is grouped
+> (working / gaps / watch / caveats) with n, *thin* flags (n < 30) and suggested actions; CSV
+> exports accepted; 14 altered exports pass end to end (see tests/test_pipeline.py).
 
 **Starting point (2026-11-07):** built; passes an automated smoke test on the real file (0 exceptions,
 all tabs, all group selections). **Nobody has visually reviewed it yet.**

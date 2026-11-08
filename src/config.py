@@ -20,6 +20,10 @@ OUTPUT_DIR = ROOT / "outputs"
 # hidden ("n<10") everywhere: tables, dashboard, memo, slides.
 MIN_N = 10
 
+# Results based on MIN_N to THIN_N - 1 people are shown but flagged as "thin"
+# (indicative only) in the dashboard and in the auto-generated takeaways.
+THIN_N = 30
+
 # "% agree" = share answering at or above this on the 1-5 scale (4 = Agree).
 TOP_BOX_MIN = 4
 

@@ -33,6 +33,20 @@ AUDIENCE_COLORS = {"Students": "#6250d6", "Adults": "#1baf7a"}
 NPS_COLORS = {"Detractor (0-6)": "#b7d3f6", "Passive (7-8)": "#5598e7", "Promoter (9-10)": "#184f95"}
 
 st.set_page_config(page_title="988 Training Insights", layout="wide")
+
+
+def _theme_type() -> str | None:
+    """'light' / 'dark' as the viewer currently sees the app (None if unknown)."""
+    try:
+        t = getattr(getattr(st.context, "theme", None), "type", None)
+        return t if t in ("light", "dark") else None
+    except Exception:  # noqa: BLE001 - older Streamlit
+        return None
+
+
+# Value labels must read on the chart background: near-white on dark, near-black on light,
+# mid-gray (readable on both, 3:1+) when the theme isn't known yet.
+LABEL_INK = {"dark": "#e8e7e1", "light": "#2b2b29"}.get(_theme_type(), "#8a8984")
 st.markdown("""<style>
 div[data-testid="stMetricValue"] {font-size: 1.9rem;}
 div[data-testid="stCaptionContainer"] p {margin-bottom: 0.2rem;}
@@ -57,7 +71,7 @@ def welcome() -> None:
     st.info("No survey file found yet.")
     st.markdown(f"""
 **To get started, either:**
-1. Upload the Microsoft Forms export (.xlsx) with **Use a different survey export** in the sidebar, or
+1. Upload the Microsoft Forms export (.xlsx or .csv) with **Use a different survey export** in the sidebar, or
 2. Save the export into the `data/` folder (`{C.DATA_DIR}`) and refresh this page.
 
 The file is read on this computer only. See *README.md → Updating the data* for how to export it.
@@ -67,9 +81,9 @@ The file is read on this computer only. See *README.md → Updating the data* fo
 
 st.sidebar.title("988 Training Insights")
 upload = st.sidebar.file_uploader(
-    "Use a different survey export (.xlsx)", type=["xlsx"],
+    "Use a different survey export (.xlsx or .csv)", type=["xlsx", "csv"],
     help="Optional. The file is read in memory on this computer and never saved. "
-         "Without an upload, the newest .xlsx in the data/ folder is used.")
+         "Without an upload, the newest .xlsx/.csv in the data/ folder is used.")
 try:
     if upload is not None:
         res = load_from_upload(upload.getvalue(), upload.name)
@@ -82,12 +96,14 @@ try:
 except Exception as e:  # noqa: BLE001 - show a friendly message instead of a traceback
     st.title("988 Training Insights")
     st.error("This file could not be read as a 988 training survey export. Check that it is the "
-             "Microsoft Forms .xlsx export (one sheet, one row per response).")
+             "Microsoft Forms export (.xlsx or .csv, one row per response).")
     with st.expander("Technical details"):
         st.code(f"{type(e).__name__}: {e}")
     st.stop()
 
 df_all = res.df
+if "audience" not in df_all:  # export without a role question: one audience for everyone
+    df_all = df_all.assign(audience="All respondents")
 
 
 def lbl(col: str) -> str:
@@ -165,7 +181,7 @@ def hbar(data: pd.DataFrame, x: str, y: str, *, title: str, tooltip: list, color
         enc["color"] = alt.Color(f"{y}:N", legend=None, scale=alt.Scale(
             domain=list(color_map), range=list(color_map.values())))
     bars = base.mark_bar(color=color, cornerRadiusEnd=4).encode(**enc)
-    text = base.mark_text(align="left", dx=4).transform_calculate(
+    text = base.mark_text(align="left", baseline="middle", dx=4, color=LABEL_INK).transform_calculate(
         _label=f"format(datum['{x}'], '{fmt}') + '{suffix}'").encode(x=f"{x}:Q", text="_label:N")
     return (bars + text).properties(height=alt.Step(30))
 
@@ -183,7 +199,7 @@ def grouped_hbar(data: pd.DataFrame, x: str, y: str, series: str, colors: dict, 
                         scale=alt.Scale(domain=order, range=[colors[k] for k in order]),
                         legend=alt.Legend(orient="top")),
         tooltip=tooltip)
-    text = base.mark_text(align="left", dx=4, fontSize=11).transform_calculate(
+    text = base.mark_text(align="left", baseline="middle", dx=4, fontSize=11, color=LABEL_INK).transform_calculate(
         _label=f"format(datum['{x}'], '{fmt}') + '{suffix}'").encode(x=f"{x}:Q", text="_label:N")
     return (bars + text).properties(height=alt.Step(17))
 
@@ -226,11 +242,40 @@ st.caption(f"{len(df):,} responses"
            + (f" · trainings from {dates.min():%b %d, %Y} to {dates.max():%b %d, %Y}" if len(dates) else "")
            + " · Retrospective survey: participants rated themselves before and after, at the end of the training.")
 
-tabs = st.tabs(["Summary", "Knowledge gains", "Intent to call 988", "Audiences & communities",
-                "Trends & sessions", "Participant voice", "Data quality & methods"])
+# One source for the tab guide (Summary tab) and each tab's opening line.
+TAB_GUIDE = {
+    "Summary": ("Is the training working, and what should we do next?",
+                "Headline numbers and plain-language takeaways with suggested actions."),
+    "Knowledge gains": ("Did participants learn what the training teaches?",
+                        "Agreement with each knowledge statement before vs. after, and how individuals moved."),
+    "Intent to call 988": ("Will knowledge turn into action?",
+                           "How likely people are to call 988, and how that links to what they know."),
+    "Audiences & communities": ("Who does the training work less well for?",
+                                "Results by audience, county, role and language, with significance tests."),
+    "Trends & sessions": ("Is quality holding up, and which sessions need follow-up?",
+                          "Results over time, and a scorecard that flags individual training sessions."),
+    "Participant voice": ("What do participants value, and what would they change?",
+                          "Themes in the two open-ended questions, overall or students vs. adults."),
+    "Data quality & methods": ("Can these numbers be trusted?",
+                               "Data checks, robustness tests, how the file was read, and definitions."),
+}
+
+
+def intro(tab: str) -> None:
+    q, what = TAB_GUIDE[tab]
+    st.markdown(f"**{q}** {what}")
+
+
+tabs = st.tabs(list(TAB_GUIDE))
 
 # ---- Summary ------------------------------------------------------------------
 with tabs[0]:
+    with st.expander("**Guide: what each tab shows**", expanded=True):
+        st.markdown("| Tab | Question it answers | What you'll find |\n|---|---|---|\n" + "\n".join(
+            f"| **{t}** | {q} | {w} |" for t, (q, w) in TAB_GUIDE.items()))
+        st.caption(f"Use the sidebar to filter by audience, language, county, role or date, to upload a new "
+                   f"export, or to download a summary. Anything based on fewer than {C.MIN_N} people is hidden; "
+                   f"results from {C.MIN_N}–{C.THIN_N - 1} people are marked *thin* (indicative only).")
     c = st.columns(5)
     c[0].metric("Responses", f"{len(df):,}")
     after = ov.get("Knowledge: % agree after (avg of outcome items)")
@@ -254,14 +299,15 @@ with tabs[0]:
                 help=(f"Scored {C.CALL_988_LIKELY_MIN_0_10}-10 on the 0-10 question. "
                       if res.call_988_scale == "0-10" else "Likely or very likely. ")
                 + "Only some respondents answered this question.")
-    c[4].caption(f"n = {n_txt(ov.get('Likely to call 988: n answered'))}")
+    n988_v = ov.get('Likely to call 988: n answered')
+    c[4].caption(f"n = {n_txt(n988_v)}" + (" · thin" if not is_blank(n988_v) and C.MIN_N <= n988_v < C.THIN_N else ""))
 
     st.subheader("What the data says")
-    bullets = insights.build(res, tables, themes, label=lbl)
-    st.markdown("\n".join(f"- {b}" for b in bullets) if bullets else "_Not enough data in this view._")
-    st.caption("Generated automatically from the tables in this dashboard, so it updates with new data "
-               "and with your filters. Every statement uses only groups of at least "
-               f"{C.MIN_N} people.")
+    items = insights.build(res, tables, themes, label=lbl)
+    st.markdown(insights.to_markdown(items) if items else "_Not enough data in this view._")
+    st.caption("Written automatically from the tables in this dashboard, so it updates with new data and "
+               f"with your filters. Uses only groups of {C.MIN_N}+ people; *thin* = fewer than {C.THIN_N}. "
+               "Suggested actions are starting points for staff discussion, not conclusions.")
 
     left, right = st.columns(2)
     rc = tables["retro_change"]
@@ -300,8 +346,8 @@ with tabs[0]:
 
 # ---- Knowledge gains ----------------------------------------------------------------
 with tabs[1]:
-    st.markdown("Did participants feel more knowledgeable after the training? Each person rated "
-                "each statement for *after* and, looking back, for *before* the training.")
+    intro("Knowledge gains")
+    st.caption("Each person rated each statement for *after* and, looking back, for *before* the training.")
     rc = tables["retro_change"]
     if rc.empty:
         st.info("No before/after question pairs were found in this file (see Data quality & methods).")
@@ -369,6 +415,7 @@ with tabs[1]:
 
 # ---- Intent to call 988 ----------------------------------------------------------------
 with tabs[2]:
+    intro("Intent to call 988")
     if "call_988" not in df:
         st.info("This file has no 'likely to call 988' question.")
     else:
@@ -440,6 +487,7 @@ for col in res.likert_cols:
     METRICS[f"pct_agree_{col}"] = (f"% agree: {lbl(col)}", f"n_agree_{col}", ".0f", [0, 100])
 
 with tabs[3]:
+    intro("Audiences & communities")
     g1, g2, g3 = st.columns([1, 2, 1])
     # Options are display labels mapped back to keys (no format_func: works on every Streamlit version)
     GROUP_LABELS = {"Audience (students vs adults)": "audience", "County": "county", "Role": "role",
@@ -467,11 +515,20 @@ with tabs[3]:
                               tooltip=["group", "split", alt.Tooltip(f"{metric}:Q", format=fmt, title=name),
                                        alt.Tooltip(f"{n_col}:Q", title="n answered")]))
         else:
+            vis = vis.assign(group=[f"{g} (n={int(n):,}{', thin' if n < C.THIN_N else ''})"
+                                    for g, n in zip(vis["group"], vis[n_col])])
             show(hbar(vis, metric, "group", title=name, domain=dom, fmt=fmt,
-                      color_map=AUDIENCE_COLORS if group == "audience" else None,
+                      color_map={f"{k} (n={int(n):,}{', thin' if n < C.THIN_N else ''})": AUDIENCE_COLORS[k]
+                                 for k, n in zip(tbl["group"], tbl[n_col]) if k in AUDIENCE_COLORS and n == n}
+                      if group == "audience" else None,
                       tooltip=["group", alt.Tooltip(f"{metric}:Q", format=fmt, title=name),
                                alt.Tooltip(f"{n_col}:Q", title="n answered"), alt.Tooltip("n:Q", title="n in group")]))
         hidden = len(tbl) - len(vis)
+        if split and not vis.empty:
+            thin_cells = vis[vis[n_col] < C.THIN_N]
+            if len(thin_cells):
+                st.caption("Thin (fewer than " + str(C.THIN_N) + " answered, indicative only): " + ", ".join(
+                    f"{r_.group} · {r_.split} (n={int(r_[n_col])})" for _, r_ in thin_cells.iterrows()) + ".")
         if hidden:
             st.caption(f"{hidden} group(s) not shown: fewer than {C.MIN_N} people in the group, or "
                        f"fewer than {C.MIN_N} answered this question.")
@@ -500,16 +557,23 @@ TREND_METRICS = {"nps": ("Net Promoter Score", [-100, 100]),
                  "pct_likely_988": ("% likely to call 988", [0, 100]),
                  "recommend_mean": ("Recommend: mean (0-10)", [0, 10])}
 with tabs[4]:
+    intro("Trends & sessions")
     t1, t2 = st.columns([1, 2])
     period = t1.radio("Period", ["Quarter", "Month"], horizontal=True)
     trend_by_label = {v[0]: k for k, v in TREND_METRICS.items()}
     tmetric = trend_by_label[t2.selectbox("Measure", list(trend_by_label), key="trend_measure")]
     pcode = "Q" if period == "Quarter" else "M"
-    overall_tr = analyze.trend(res, df, period=pcode).assign(audience="All")
+    parts = []
+    overall_tr = analyze.trend(res, df, period=pcode)
+    if not overall_tr.empty:
+        parts.append(overall_tr.assign(audience="All"))
     by_aud = analyze.trend(res, df, period=pcode, by="audience")
-    tr = pd.concat([overall_tr, by_aud[by_aud["audience"].isin(AUDIENCE_COLORS)]], ignore_index=True)
-    tr = tr[~tr["suppressed"] & tr[tmetric].notna()]
-    if tr.empty:
+    if not by_aud.empty:
+        parts.append(by_aud[by_aud["audience"].isin(AUDIENCE_COLORS)])
+    tr = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+    if not tr.empty and tmetric in tr:
+        tr = tr[~tr["suppressed"] & tr[tmetric].notna()]
+    if tr.empty or tmetric not in tr:
         st.info("Not enough dated responses for a trend.")
     else:
         show(lines(tr, "period", tmetric, "audience", {"All": "#52514e", **AUDIENCE_COLORS},
@@ -553,7 +617,8 @@ with tabs[4]:
 
 # ---- Participant voice --------------------------------------------------------------------
 with tabs[5]:
-    st.markdown("Themes in the two open-ended questions, coded with transparent keyword rules "
+    intro("Participant voice")
+    st.caption("Themes in the two open-ended questions, coded with transparent keyword rules "
                 "(`src/text_themes.py`). One answer can mention several themes. Individual answers are "
                 "never shown, to protect participants.")
     vsplit = st.toggle("Compare students and adults", value=False, key="v_split")
@@ -591,6 +656,7 @@ with tabs[5]:
 
 # ---- Data quality & methods ------------------------------------------------------------
 with tabs[6]:
+    intro("Data quality & methods")
     st.markdown("**Data-quality checks** for the current view")
     st.dataframe(tables["quality"], hide_index=True, width="stretch")
     sens = tables.get("sensitivity", pd.DataFrame())

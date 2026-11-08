@@ -152,8 +152,55 @@ def test_theme_coding_is_multilabel_and_counts_uncoded(res):
 
 def test_insights_build(res):
     tables = analyze.run_all(res)
-    bullets = insights.build(res, tables, text_themes.run_all(res))
-    assert bullets and all(isinstance(b, str) for b in bullets)
+    items = insights.build(res, tables, text_themes.run_all(res))
+    assert items and all(i.kind in insights.KINDS for i in items)
+    md = insights.to_markdown(items)
+    assert "What's working" in md and "n = " in md
+
+
+def test_thin_marker():
+    assert "thin" in insights.n_(C.THIN_N - 1) and "thin" not in insights.n_(C.THIN_N)
+
+
+# ---- reasonable data updates (BuildFest: "support reasonable data updates") --------
+@pytest.fixture(scope="session")
+def raw_fake(fake_file):
+    return pd.read_excel(fake_file, dtype=object)
+
+
+def _col(df, key):
+    return [c for c in df.columns if key.lower() in c.lower()][0]
+
+
+def test_csv_export_matches_xlsx(fake_file, raw_fake, tmp_path):
+    p = tmp_path / "export.csv"
+    raw_fake.to_csv(p, index=False)
+    a, b = load_and_clean(fake_file), load_and_clean(p)
+    assert len(a.df) == len(b.df) and set(a.column_map) == set(b.column_map)
+    assert analyze.nps(a.df["recommend"]) == pytest.approx(analyze.nps(b.df["recommend"]))
+    assert load_and_clean(p.read_bytes(), name="upload.csv").df.shape == b.df.shape
+
+
+@pytest.mark.parametrize("variant", ["reordered", "no_role", "no_date", "no_988", "no_delivery",
+                                     "renamed", "extra_column", "tiny"])
+def test_pipeline_survives_form_changes(raw_fake, tmp_path, variant):
+    df = raw_fake
+    v = {"reordered": lambda: df[df.columns[::-1]],
+         "no_role": lambda: df.drop(columns=[_col(df, "are you")]),
+         "no_date": lambda: df.drop(columns=[_col(df, "date of your training")]),
+         "no_988": lambda: df.drop(columns=[_col(df, "call 988")]),
+         "no_delivery": lambda: df.drop(columns=[c for c in df.columns if "aspects" in c.lower()]),
+         "renamed": lambda: df.rename(columns={_col(df, "county"): "County of training"}),
+         "extra_column": lambda: df.assign(**{"Any other comments?": "Thanks"}),
+         "tiny": lambda: df.head(12)}[variant]()
+    p = tmp_path / f"{variant}.xlsx"
+    v.to_excel(p, index=False)
+    r = load_and_clean(p)
+    tables = analyze.run_all(r)
+    insights.build(r, tables, text_themes.run_all(r))
+    analyze.export_tables(r)
+    if variant == "renamed":
+        assert "county" in r.column_map
 
 
 def test_dashboard_runs_without_errors(fake_file, monkeypatch):

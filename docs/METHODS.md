@@ -7,7 +7,7 @@ shows this page under **Data quality & methods**. Settings live in `src/config.p
 
 | Step | What happens |
 |---|---|
-| Find the file | The newest `.xlsx` in `data/`, or a file uploaded in the dashboard (read in memory, never saved) |
+| Find the file | The newest `.xlsx` or `.csv` in `data/`, or a file uploaded in the dashboard (read in memory, never saved) |
 | Detect columns | By header text and answer values, so a re-ordered or re-exported form still works. Platform columns (Id, Start/Completion time) are ignored. The result is printed in the cleaning report |
 | Normalize text | Unicode normalization; non-breaking spaces, invisible direction marks and repeated spaces removed; trailing semicolons on multi-select roles removed |
 | Missing values | Blank, "None", "N/A", "-" and similar are treated as missing, **except** in the two open-text questions, where "None"/"N/A" mean "nothing to add" and are kept as answers |
@@ -47,7 +47,15 @@ shows this page under **Data quality & methods**. Settings live in `src/config.p
 - **Independent cross-check:** `scripts/crosscheck.py` recomputes 12 headline numbers from the
   raw Excel with separate, simple code and compares them with the pipeline.
 
-## 4. Open-ended answers (`src/text_themes.py`)
+## 4. Automatic takeaways (`src/insights.py`)
+
+The Summary tab's "What the data says" is generated from the same aggregate tables, so it
+updates with new data and filters. It only uses groups of 10+, labels results under 30 as
+*thin*, only calls a group difference real when its test gives p < 0.05 (and states the
+effect size), compares sessions within the same audience, and pairs each gap with a
+suggested action for staff to discuss.
+
+## 5. Open-ended answers (`src/text_themes.py`)
 
 Each answer is matched against transparent keyword rules (regular expressions, English and
 Spanish) for its question. One answer can carry several themes; answers that match nothing
@@ -56,15 +64,17 @@ dictionary words that appear in at least 10 different answers. No individual ans
 to an AI tool. Accuracy is checked against a blind, human-coded sample with
 `scripts/validate_themes.py`. Individual answers are never displayed or exported.
 
-## 5. Privacy rules
+## 6. Privacy rules
 
 - **Small-group rule:** any group, and any measure within a group, based on fewer than
   **10** answers is hidden and shown as "<10". This applies to every chart, table, filter
   combination and download.
+- **Thin results:** results based on 10–29 answers (`THIN_N` = 30) are shown but labelled
+  *thin*: in group charts, on the 988 tile and in the automatic takeaways.
 - Only aggregate results are displayed or exported. No row-level data, no open-text answers.
 - The data file stays on the user's computer. Uploads are read in memory and not saved.
 
-## 6. Limitations to keep in mind
+## 7. Limitations to keep in mind
 
 - **Retrospective self-report:** "before" ratings are given after the training. This avoids
   some biases of a separate pre-test, but recall and social-desirability bias can inflate
@@ -78,8 +88,9 @@ to an AI tool. Accuracy is checked against a blind, human-coded sample with
   firm conclusions.
 - **Keyword themes** miss sarcasm, negation and unusual wording. About 30% of answers are uncoded.
 
-## 7. Charts
+## 8. Charts
 
 Colors were checked for color-vision deficiency with a palette validator: before = orange,
 after = blue; students = violet, adults = aqua. Every chart has a table view and value labels,
-so color is never the only cue.
+so color is never the only cue. Value labels switch between dark and light ink to match the
+dashboard theme.

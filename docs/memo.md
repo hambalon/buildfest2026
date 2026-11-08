@@ -83,7 +83,7 @@ compared these pairs (Wilcoxon test) and compared groups with rank-based tests a
 answers were grouped into themes with transparent keyword rules, built only from word counts so no AI tool
 saw individual answers. **Any group with fewer than 10 people is hidden.** We validated results in four
 ways: a team member's 10-row check against the raw file, hand-calculations of three headline numbers in
-Excel, an independent re-computation of 12 headline numbers (all match), and 21 automated tests.
+Excel, an independent re-computation of 12 headline numbers (all match), and 31 automated tests.
 
 ## Implementation: how EveryMind would use the tool
 
@@ -93,7 +93,8 @@ Excel, an independent re-computation of 12 headline numbers (all match), and 21 
 - **What they need:** a computer with free Python installed (one time), and the Forms export. Double-click
   the launcher, drop in or upload the file, then review the Summary and the session scorecard and click
   **Download summary** for reports. The data never leaves the computer, small groups are hidden
-  automatically, and new exports work without changes (a built-in check confirms the file was read correctly).
+  automatically, and new exports (.xlsx or .csv) work without changes. We tested 14 altered exports (renamed,
+  reordered or missing questions), and a built-in check confirms each file was read correctly.
 
 ## Limitations
 
