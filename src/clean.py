@@ -124,7 +124,9 @@ def standardize_county(series: pd.Series) -> pd.Series:
     s = series.astype("string")
     keys = s.map(county_key, na_action="ignore")
     pairs = pd.DataFrame({"key": keys, "value": s}).dropna()
-    display = pairs.groupby("key")["value"].agg(lambda v: v.value_counts().index[0])
+    display = pairs.groupby("key")["value"].agg(
+        lambda v: re.sub(_COUNTY_AFFIX.pattern, "", v.value_counts().index[0].strip(),
+                         flags=re.IGNORECASE).strip())
     return keys.map(display).astype("string")
 
 

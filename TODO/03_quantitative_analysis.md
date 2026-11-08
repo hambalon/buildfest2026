@@ -23,27 +23,32 @@ Suppression: a whole group is blanked if n<10. Each metric is also blanked if fe
 Only 293 people answered 988 overall.**
 
 ## Tasks
-- [ ] Run: `python -m src.analyze` (also reruns cleaning).
-- [ ] Read all five CSVs. Write a 5–10 bullet **findings note** in `docs/memo.md`
+- [x] Run: `python -m src.analyze` (also reruns cleaning).
+- [x] Read all five CSVs. Write a 5–10 bullet **findings note** in `docs/memo.md`
       under "Key findings", each with its n.
-- [ ] **Retro change:** report mean change (1–5 scale), % improved, and % agree
+- [x] **Retro change:** report mean change (1–5 scale), % improved, and % agree
       before vs after for each of the 3 outcome items. Cite the Wilcoxon p as "p < 0.001"
       style, never as 0.
-- [ ] **988 subset check:** only ~23% answered `call_988`. Compare that subset to
+- [x] **988 subset check:** only ~23% answered `call_988`. Compare that subset to
       everyone else on recommend mean and retro change (a quick script or notebook,
       output aggregates only). If they differ, say so in limitations.
-- [ ] **Group differences:** for county, role and language, note the largest and smallest
+- [x] **Group differences:** for county, role and language, note the largest and smallest
       values among *non-suppressed* groups. With n differences this large, describe them
       as descriptive, not significant, unless you add a test. Optional test: Kruskal-Wallis
       on retro change across groups with n≥10 (`scipy.stats.kruskal`).
-- [ ] **Training quality (`aspect_01`–`03`):** % agree for presenter engagement, knowledge
+- [x] **Training quality (`aspect_01`–`03`):** % agree for presenter engagement, knowledge
       and organization. Each has its own n (about 1,120–1,150).
-- [ ] **Optional: trend over time.** Monthly n and mean retro change by `training_date`.
+- [x] **Optional: trend over time.** Monthly n and mean retro change by `training_date`.
       Use only months with n≥10.
-- [ ] **Optional: ceiling check.** Share of people already at 5 "before". They can't
+- [x] **Optional: ceiling check.** Share of people already at 5 "before". They can't
       improve, so mean change understates the effect for them.
-- [ ] Sanity-check 3 numbers by hand in Excel (e.g., overall % agree for `outcome_03` and
+- [x] Sanity-check 3 numbers by hand in Excel *(Done 2026-11-07: NPS +12, % likely 988 73%,
+      % agree outcome_03 after 92.3%; all match.)* (e.g., overall % agree for `outcome_03` and
       NPS). Record this in `docs/AI_LOG.md`.
+
+*Done 2026-11-07: findings 1–7 are in `docs/memo.md`. New tables from `python -m src.analyze`:
+`subset_988.csv` (Mann-Whitney), `ceiling.csv`, `trend_monthly.csv` (months n≥10 only) and
+`group_tests.csv` (Kruskal-Wallis, pooled "Other"/"Not reported" excluded).*
 
 ## Interpretation rules (put these in the memo methods/limitations)
 - **Retrospective pre-test:** "before" ratings were given *after* the training.
