@@ -95,4 +95,5 @@ errors or problems · what we verified manually and how · kept / changed / disc
   AppTest run on fake data with a language, county and role filter, cycling all 30
   group × metric combinations each time: 0 exceptions. Analysis CSVs are unchanged except
   for the new `n_agree_*` columns.
-- **Still to do by a human:** visual review in light and dark theme (TODO/05, first box).
+- **Visual review (human):** all tabs checked in light and dark theme on fake data, with a
+  county filter and the download button. No problems found.

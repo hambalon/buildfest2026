@@ -29,8 +29,9 @@ DATA_FILE=outputs/FAKE_survey.xlsx streamlit run app.py   # fake data (safe to s
 ```
 
 ## Tasks
-- [ ] **Visual review** in a browser, light and dark theme (Settings → Theme). Check
-      label overlap, long question labels and empty charts.
+- [x] **Visual review** in a browser, light and dark theme (Settings → Theme). Check
+      label overlap, long question labels and empty charts. *(Done 2026-11-07 on fake data: all
+      tabs, both themes, a county filter and the download button.)*
 - [x] **Shorten labels:** `res.label()` already strips the matrix stem. Long sub-items may
       still wrap. Consider a `SHORT_LABELS` dict in `config.py` (e.g., `outcome_02` → "Can describe 988").
       *(Done: `SHORT_LABELS` in config.py section 3; full question stays in tooltips.)*
