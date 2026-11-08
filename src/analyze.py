@@ -496,7 +496,9 @@ def intent_gap(res: CleanResult, df: pd.DataFrame | None = None) -> pd.DataFrame
 def session_scorecard(res: CleanResult, df: pd.DataFrame | None = None) -> pd.DataFrame:
     """One row per session (training date x county) with at least MIN_N responses.
 
-    Flags sessions that need follow-up (thresholds in config). `attrs` carries how
+    Flags sessions that need follow-up (thresholds in config); flagged sessions come
+    first. `thin` marks sessions under THIN_N responses, where a flag is more likely
+    to be chance. `attrs` carries how
     many sessions / responses were too small to show.
     """
     df = res.df if df is None else df
@@ -519,10 +521,13 @@ def session_scorecard(res: CleanResult, df: pd.DataFrame | None = None) -> pd.Da
         if m["pct_delivery"] == m["pct_delivery"] and m["pct_delivery"] < C.SESSION_ALERT_DELIVERY_BELOW:
             flags.append("Low delivery rating")
         rows.append({"date": pd.Timestamp(date), "county": cty, **m,
-                     "flags": "; ".join(flags), "needs_follow_up": bool(flags)})
+                     "flags": "; ".join(flags), "needs_follow_up": bool(flags),
+                     "thin": len(g) < C.THIN_N})  # small session: a flag may be chance, read with care
     out = pd.DataFrame(rows)
     if not out.empty:
-        out = out.sort_values("date", ascending=False).round(1).reset_index(drop=True)
+        # Flagged sessions first (what staff act on), then newest first.
+        out = (out.sort_values(["needs_follow_up", "date"], ascending=[False, False])
+               .round(1).reset_index(drop=True))
     out.attrs.update(hidden_sessions=hidden_sessions, hidden_responses=hidden_resp)
     return out
 
