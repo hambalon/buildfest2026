@@ -66,18 +66,37 @@ class CleanResult:
 # --------------------------------------------------------------------------- #
 # Finding and loading the file
 # --------------------------------------------------------------------------- #
+SUPPORTED = (".xlsx", ".csv")  # Microsoft Forms exports either
+
+
 def find_data_file(path: str | Path | None = None) -> Path:
-    """Explicit path > DATA_FILE env var > newest .xlsx in data/."""
+    """Explicit path > DATA_FILE env var > newest .xlsx/.csv in data/."""
     if path:
         return Path(path)
     if os.environ.get("DATA_FILE"):
         return Path(os.environ["DATA_FILE"])
-    files = [p for p in C.DATA_DIR.glob("*.xlsx") if not p.name.startswith("~$")]
+    files = [p for p in C.DATA_DIR.iterdir()
+             if p.suffix.lower() in SUPPORTED and not p.name.startswith(("~$", "."))] \
+        if C.DATA_DIR.exists() else []
     if not files:
         raise FileNotFoundError(
-            f"No .xlsx file found in {C.DATA_DIR}. See data/README.md for where to put it."
+            f"No .xlsx or .csv survey file found in {C.DATA_DIR}. See data/README.md for where to put it."
         )
     return max(files, key=lambda p: p.stat().st_mtime)
+
+
+def read_table(source, name: str) -> pd.DataFrame:
+    """Read the first sheet of an .xlsx, or a .csv (UTF-8 with or without BOM, or Excel's cp1252)."""
+    if name.lower().endswith(".csv"):
+        for enc in ("utf-8-sig", "cp1252"):
+            try:
+                if hasattr(source, "seek"):
+                    source.seek(0)
+                return pd.read_csv(source, dtype=object, encoding=enc)
+            except UnicodeDecodeError:
+                continue
+        raise ValueError("Could not decode the CSV file (expected UTF-8 or Windows-1252).")
+    return pd.read_excel(source, sheet_name=0, dtype=object)
 
 
 # --------------------------------------------------------------------------- #
@@ -307,8 +326,9 @@ def is_numeric_0_10(series: pd.Series) -> bool:
 
 
 def to_recommend(series: pd.Series) -> pd.Series:
-    num = pd.to_numeric(series, errors="coerce")
-    extracted = pd.to_numeric(series.astype("string").str.extract(r"(\d+(?:\.\d+)?)")[0], errors="coerce")
+    num = pd.to_numeric(series, errors="coerce").astype(float)
+    extracted = pd.to_numeric(series.astype("string").str.extract(r"(\d+(?:\.\d+)?)")[0],
+                              errors="coerce").astype(float)  # same dtype: future pandas requires it
     num = num.fillna(extracted)
     return num.where(num.between(0, 10)).astype("Float64")
 
@@ -339,17 +359,18 @@ def load_and_clean(path=None, name: str | None = None) -> CleanResult:
     """Load and clean a survey export.
 
     path: a file path, an in-memory file (bytes / BytesIO, e.g. a dashboard upload),
-          or None for the newest .xlsx in data/. name: display name for in-memory files.
+          or None for the newest .xlsx/.csv in data/. name: display name for in-memory
+          files (its extension decides .csv vs .xlsx).
     """
     if isinstance(path, (bytes, bytearray)):
         path = io.BytesIO(path)
     if hasattr(path, "read"):  # in-memory upload: never written to disk
-        src_name = name or "uploaded file"
-        raw = pd.read_excel(path, sheet_name=0, dtype=object)
+        src_name = name or "uploaded file.xlsx"
+        raw = read_table(path, src_name)
     else:
         src = find_data_file(path)
         src_name = src.name
-        raw = pd.read_excel(src, sheet_name=0, dtype=object)
+        raw = read_table(src, src_name)
     report: list[str] = []
     private: list[str] = []
 

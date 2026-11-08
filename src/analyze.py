@@ -450,7 +450,7 @@ def trend(res: CleanResult, df: pd.DataFrame | None = None, period: str | None =
     """Metrics per time period (default config.TREND_PERIOD), optionally split by
     a column such as 'audience'. Rows without a training date are left out."""
     df = res.df if df is None else df
-    if "training_date" not in df:
+    if "training_date" not in df or (by and by not in df):
         return pd.DataFrame()
     period = period or C.TREND_PERIOD
     d = df[df["training_date"].notna()]

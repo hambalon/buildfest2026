@@ -190,3 +190,27 @@ errors or problems · what we verified manually and how · kept / changed / disc
   = 2 pages, appendix = 1 page.
 - **Still for humans:** theme validation (`validate_themes.py`), a visual pass of the final
   dashboard, a final read of memo + appendix, team number, uploading, link permissions.
+
+---
+
+### 2026-11-08 · Claude Code (Claude Opus) · Dashboard readability, takeaways, data-update robustness
+- **Prompt (summary):** chart percentages are hard to read in dark mode; "What the data says" is
+  vague; add a section explaining each tab; fix anything needed so the project works as the
+  BuildFest brief specifies; commit, push, open a PR, and update the docs.
+- **Produced:** value labels that follow the light/dark theme (vertically centered); a guide to every
+  tab on the Summary tab, plus a one-line purpose at the top of each tab (one shared definition);
+  `src/insights.py` rewritten into *What's working / Gaps to act on / What to watch / Data caveats*,
+  with exact numbers, n, *thin* flags (`THIN_N` = 30), test results and suggested actions; CSV
+  exports accepted (data folder and upload); docs updated.
+- **Brief check ("must support reasonable data updates"):** the AI built 14 altered exports from
+  the fake file (reordered, renamed, extra or missing questions, CSV, text dates, tiny files, new
+  counties/roles, Spanish-only) and ran the pipeline and every dashboard control on each.
+  **3 failures found:** CSV not readable; a file without the role question crashed the analysis;
+  a file without the date question crashed the Trends tab. All fixed; 14/14 now pass and 9 of the
+  scenarios are now permanent tests. A pandas warning that would become an error in the next major
+  pandas version was fixed too.
+- **Judgment fix:** the takeaways first named an *adult* session as the model for low-scoring
+  *student* sessions; changed to compare within the same audience.
+- **Verified:** pytest 31/31 and `verify_pipeline.py` 0 fail on Python 3.9 and 3.14;
+  `crosscheck.py` 12/12; every dashboard control 0 exceptions; dark-mode screenshots reviewed
+  (fake data). The AI only read aggregate takeaways from the real file (n ≥ 10).

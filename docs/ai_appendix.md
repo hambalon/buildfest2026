@@ -47,7 +47,7 @@ decisions: non-standard labels count as missing (D1), "likely" = 7–10 (D2), "N
 
 **How final findings were validated against the data.** An independent script recomputes 12 headline
 numbers straight from the raw Excel with separate, simple code: **12/12 match** the dashboard. The
-structure check passes on the real file (0 failures), 21 automated tests pass, and every
+structure check passes on the real file (0 failures), 31 automated tests pass, and every
 before/after result holds when low-effort "same answer to everything" responses are removed.
 **Limits:** theme counts are approximate keyword matches. Retrospective self-ratings measure perceived,
 not tested, learning.

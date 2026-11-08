@@ -22,7 +22,7 @@ import pandas as pd  # noqa: E402
 
 from src import analyze, text_themes  # noqa: E402
 from src import config as C  # noqa: E402
-from src.clean import SMALL_GROUP, _best_scale, find_data_file, load_and_clean, norm_text  # noqa: E402
+from src.clean import SMALL_GROUP, _best_scale, find_data_file, load_and_clean, norm_text, read_table  # noqa: E402
 
 results: list[tuple[str, str, str]] = []
 
@@ -49,10 +49,11 @@ def main() -> int:
 
     # ---- 1. File ------------------------------------------------------------
     path = find_data_file(args.file)
-    xl = pd.ExcelFile(path)
+    is_csv = path.suffix.lower() == ".csv"
+    n_sheets = 1 if is_csv else len(pd.ExcelFile(path).sheet_names)
     check("File found", True, path.name)
-    check("Single sheet", len(xl.sheet_names) == 1 or None, f"{len(xl.sheet_names)} sheet(s)")
-    raw = pd.read_excel(path, sheet_name=0, dtype=object)
+    check("Single sheet", n_sheets == 1 or None, "CSV" if is_csv else f"{n_sheets} sheet(s)")
+    raw = read_table(path, path.name)
     check("Shape", True, f"{raw.shape[0]} rows x {raw.shape[1]} columns")
     check("20 columns as expected", raw.shape[1] == 20 or None, str(raw.shape[1]))
 
