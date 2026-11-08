@@ -28,7 +28,8 @@
   missing, because where "Satisfied" falls on an agree/disagree scale is unclear
 - The "likely to call 988" question was added to the form later: it was first answered on
   April 8, 2026, and only 293 of 1,299 respondents (23%) answered it. Results for that
-  question describe this later subset only
+  question describe this later subset only. "Likely to call 988" means a score of 7–10 on
+  its 0–10 scale
 - County spelling variants (e.g. "X" vs "X County") were merged before grouping
 - "None" / "N/A" answers to the open-text questions were kept as answers ("nothing to
   change"), not treated as missing

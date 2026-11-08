@@ -37,8 +37,9 @@ converts to the right number, and a human has spot-checked it against the raw Ex
       the line in `AGREE_SCALE` in `src/config.py`. Recommendation: A. The ordering
       of "Satisfied" on an agree scale is ambiguous, and items 04–06 are secondary.
       Set `NONSTANDARD_AGREE_LABELS` in `src/config.py` (section 1). Either way, mention it in the methods section.
-- [ ] **D2: 988 "likely" cutoff.** `CALL_988_LIKELY_MIN_0_10 = 7` (7–10 = likely).
+- [x] **D2: 988 "likely" cutoff.** `CALL_988_LIKELY_MIN_0_10 = 7` (7–10 = likely).
       Alternative: 9–10 ("very likely", NPS-style). Pick one and use it everywhere.
+      *(Decided 2026-11-07: keep 7–10.)*
 - [x] **D3: Duplicate rows.** The report shows the exact-duplicate count; duplicates are kept.
       If it's not 0, check by Id/time locally whether they are real double submissions.
       *(Checked 2026-11-07: 0 exact duplicates, nothing to decide.)*

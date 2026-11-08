@@ -131,4 +131,7 @@ errors or problems · what we verified manually and how · kept / changed / disc
 - **10-row spot-check (human):** after the fixes, rows 5, 100, 250, 400, 550, 700, 850, 1000,
   1150 and 1290 compared between the raw Excel and `survey_clean.csv` (Likert → number, date,
   county, roles). All 10 match.
-- **Still open:** D2 (988 cutoff).
+- **Decisions (team member, 2026-11-07):** D2: "likely to call 988" = 7–10 on the 0–10 scale
+  (default kept; it is the plain reading of "likely" above the midpoint, and 9–10 would mean
+  "very likely"). "None"/"N/A" open-text answers are kept as answers. The AI recommended both
+  defaults; a human made the call.
