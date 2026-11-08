@@ -39,23 +39,27 @@ converts to the right number, and a human has spot-checked it against the raw Ex
       Set `NONSTANDARD_AGREE_LABELS` in `src/config.py` (section 1). Either way, mention it in the methods section.
 - [ ] **D2: 988 "likely" cutoff.** `CALL_988_LIKELY_MIN_0_10 = 7` (7–10 = likely).
       Alternative: 9–10 ("very likely", NPS-style). Pick one and use it everywhere.
-- [ ] **D3: Duplicate rows.** The report shows the exact-duplicate count; duplicates are kept.
+- [x] **D3: Duplicate rows.** The report shows the exact-duplicate count; duplicates are kept.
       If it's not 0, check by Id/time locally whether they are real double submissions.
+      *(Checked 2026-11-07: 0 exact duplicates, nothing to decide.)*
 
 ### Manual checks (human only, on your own machine; never share the rows)
-- [ ] Run `python -m src.clean` and read `outputs/cleaning_report.md` end to end.
+- [x] Run `python -m src.clean` and read `outputs/cleaning_report.md` end to end.
 - [ ] Open the raw Excel and `outputs/survey_clean.csv` side by side. For **10 random
       rows**, check that each Likert label matches its number, the date matches, the
       county matches, and multi-select roles split correctly.
-- [ ] Confirm the three before/after pairs (`before_01`↔`outcome_01`, etc.) by reading the full question text.
-- [ ] Check that the counts of non-missing values per column in Excel (COUNTA) match the
+- [x] Confirm the three before/after pairs (`before_01`↔`outcome_01`, etc.) by reading the full question text.
+- [x] Check that the counts of non-missing values per column in Excel (COUNTA) match the
       `missing/unparseable` lines in the report.
-- [ ] Check when the 988 question started being answered: in Excel, filter
+- [x] Check when the 988 question started being answered: in Excel, filter
       `call_988` non-blank and look at the earliest training date. Write the date
-      range (not the rows) in the memo limitations section.
-- [ ] Look at the 10 county names in the report file. Are any spelling variants of
-      the same county? If so, add a mapping. (Not built yet: add a `COUNTY_ALIASES`
-      dict to `config.py` and apply it in `clean.py` before `group_small`.)
+      range (not the rows) in the memo limitations section. *(First answered 2026-04-08.
+      Memo line still to add.)*
+- [x] Look at the 10 county names in the report file. Are any spelling variants of
+      the same county? If so, add a mapping. *(Done: variants are merged automatically in
+      `clean.standardize_county`, 10 → 7 names; `COUNTY_ALIASES` in config.py for any others.)*
+- [x] Open-text "None"/"N/A" answers are kept as answers in the text columns
+      (`TEXT_ANSWER_TOKENS` in config.py), not dropped as missing.
 - [ ] Record what you checked and what you found in `docs/AI_LOG.md` ("Verified manually").
 
 ## Acceptance criteria

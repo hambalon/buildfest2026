@@ -110,3 +110,22 @@ errors or problems · what we verified manually and how · kept / changed / disc
   for the new `n_agree_*` columns.
 - **Visual review (human):** all tabs checked in light and dark theme on fake data, with a
   county filter and the download button. No problems found.
+
+---
+
+### 2026-11-07 · Claude Code (Claude Opus) · Stage 02 manual checks and two cleaning fixes
+- **Verified manually (human, locally against the raw Excel):** read `cleaning_report.md` end to
+  end. 1,299 responses × 20 columns; no empty rows; 0 exact duplicates (so D3 needs no action);
+  the 3 before/after pairs match by full question text; date range and missing counts consistent;
+  14 respondents chose more than one role; COUNTA counts match the report; the 988 question was
+  first answered on 2026-04-08 (293 answers).
+- **Problems the human found:** (1) county spelling variants such as "X" vs "X County" were counted
+  as separate counties; (2) "None"/"N/A" in the open-text questions were treated as missing, so
+  the "Nothing / no changes" theme could never match them.
+- **Produced (AI):** `COUNTY_ALIASES` + automatic merging in `clean.standardize_county` (ignores case
+  and a trailing "County"/"Co." or leading "Condado de"; shows the most common spelling);
+  `TEXT_ANSWER_TOKENS` in `config.py` keeps "none"/"n/a"/"na"/"not applicable" as answers in the
+  two open-text columns only. Both are reported in `cleaning_report.md`.
+- **Effect (verify output):** county 10 → 7 distinct names; text_improve answered 638 → 651.
+  `verify_pipeline.py`: 36 pass, 5 warn (known), 0 fail.
+- **Still open:** the 10-row spot-check (Excel vs `survey_clean.csv`); D2 (988 cutoff).

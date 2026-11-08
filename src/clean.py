@@ -93,8 +93,9 @@ def short_label(header: str) -> str:
     return parts[-1].strip() if len(parts) > 1 else header
 
 
-def norm_text(value):
+def norm_text(value, missing_tokens=None):
     """Normalize one cell. Returns a clean string or pd.NA."""
+    missing_tokens = C.MISSING_TOKENS if missing_tokens is None else missing_tokens
     if value is None or (isinstance(value, float) and pd.isna(value)):
         return pd.NA
     if not isinstance(value, str):
@@ -104,9 +105,27 @@ def norm_text(value):
     s = s.replace("’", "'").replace("‘", "'").replace("“", '"').replace("”", '"')
     s = _WS.sub(" ", s).strip()
     s = re.sub(r"\s*;\s*", ";", s).strip(";").strip()  # "A ; B;" -> "A;B"
-    if s.lower() in C.MISSING_TOKENS:
+    if s.lower() in missing_tokens:
         return pd.NA
     return s
+
+
+_COUNTY_AFFIX = re.compile(r"\s+(county|co\.?)$|^condado de\s+")
+
+
+def county_key(value: str) -> str:
+    """'Montgomery County' / 'montgomery' / 'Condado de Montgomery' -> 'montgomery'."""
+    key = _COUNTY_AFFIX.sub("", value.strip().lower()).strip()
+    return C.COUNTY_ALIASES.get(key, key)
+
+
+def standardize_county(series: pd.Series) -> pd.Series:
+    """Merge spelling variants; each merged group shows its most common original spelling."""
+    s = series.astype("string")
+    keys = s.map(county_key, na_action="ignore")
+    pairs = pd.DataFrame({"key": keys, "value": s}).dropna()
+    display = pairs.groupby("key")["value"].agg(lambda v: v.value_counts().index[0])
+    return keys.map(display).astype("string")
 
 
 def norm_header(h) -> str:
@@ -329,6 +348,7 @@ def load_and_clean(path: str | Path | None = None) -> CleanResult:
 
     empty = df.isna().all(axis=1)
     df = df[~empty].reset_index(drop=True)
+    raw = raw[~empty].reset_index(drop=True)  # kept aligned for open-text re-reading
     report.append(f"Dropped {int(empty.sum())} completely empty rows -> {len(df)} responses")
     report.append(f"Exact duplicate rows (kept, review manually): {int(df.duplicated().sum())}")
 
@@ -367,10 +387,21 @@ def load_and_clean(path: str | Path | None = None) -> CleanResult:
             out[name] = to_date(s)
             bad = set()
         elif role.startswith("text_"):
-            out[name] = s.astype("string")
+            # "None" / "N/A" are real answers here ("nothing to change"), so keep them
+            keep = raw[rawcol].map(lambda v: norm_text(v, C.MISSING_TOKENS - C.TEXT_ANSWER_TOKENS))
+            n_kept = int(keep.notna().sum() - s.notna().sum())
+            out[name] = keep.astype("string")
             text_cols.append(name)
             bad = set()
-        else:  # language, county, role
+            if n_kept:
+                report.append(f"      kept {n_kept} 'none'/'n/a' answers as responses")
+        elif role == "county":
+            out[name] = standardize_county(s)
+            bad = set()
+            n_before, n_after = s.nunique(), out[name].nunique()
+            if n_before != n_after:
+                report.append(f"      merged spelling variants: {n_before} -> {n_after} distinct names")
+        else:  # language, role
             out[name] = s.astype("string")
             bad = set()
 
