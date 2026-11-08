@@ -63,22 +63,32 @@ def person_retro_change(res: CleanResult, df: pd.DataFrame) -> pd.Series:
 # Tables
 # --------------------------------------------------------------------------- #
 def overall(res: CleanResult, df: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Headline numbers. A metric answered by fewer than MIN_N people is blanked
+    (its "n answered" row stays, so callers can show "n<10")."""
     df = res.df if df is None else df
     rows = [("Responses", len(df))]
+
+    def block(n_name, n, metrics):
+        ok = n >= C.MIN_N
+        return [(n_name, n)] + [(name, fn() if ok else float("nan")) for name, fn in metrics]
+
     if "recommend" in df:
-        rows += [("Recommend: n answered", int(df["recommend"].notna().sum())),
-                 ("Recommend: mean (0-10)", round(df["recommend"].astype(float).mean(), 2)),
-                 ("Net Promoter Score", round(nps(df["recommend"]), 1))]
+        s = df["recommend"]
+        rows += block("Recommend: n answered", int(s.notna().sum()), [
+            ("Recommend: mean (0-10)", lambda: round(s.astype(float).mean(), 2)),
+            ("Net Promoter Score", lambda: round(nps(s), 1))])
     if "call_988" in df:
-        rows += [("Likely to call 988: n answered", int(df["call_988"].notna().sum())),
-                 ("Likely to call 988: % likely", round(pct_likely_988(res, df["call_988"]), 1))]
+        s = df["call_988"]
+        metrics = [("Likely to call 988: % likely", lambda: round(pct_likely_988(res, s), 1))]
         if res.call_988_scale == "0-10":
-            rows += [("Likely to call 988: mean (0-10)", round(df["call_988"].astype(float).mean(), 2))]
+            metrics += [("Likely to call 988: mean (0-10)", lambda: round(s.astype(float).mean(), 2))]
+        rows += block("Likely to call 988: n answered", int(s.notna().sum()), metrics)
     if res.retro_pairs:
         ch = person_retro_change(res, df)
-        rows += [("Retro change: n with any pair", int(ch.notna().sum())),
-                 ("Retro change: mean points (1-5 scale)", round(ch.mean(), 2)),
-                 ("Retro change: % who improved on average", round((ch.dropna() > 0).mean() * 100, 1))]
+        rows += block("Retro change: n with any pair", int(ch.notna().sum()), [
+            ("Retro change: mean points (1-5 scale)", lambda: round(ch.mean(), 2)),
+            ("Retro change: % who improved on average",
+             lambda: round((ch.dropna() > 0).mean() * 100, 1))])
     return pd.DataFrame(rows, columns=["metric", "value"])
 
 
@@ -145,7 +155,9 @@ def _metrics(res: CleanResult, g: pd.DataFrame) -> dict:
         m["n_retro"] = n
         put("retro_change_mean", n, ch.mean())
     for col in res.likert_cols:
-        put(f"pct_agree_{col}", int(g[col].notna().sum()), top_box(g[col]))
+        n = int(g[col].notna().sum())
+        m[f"n_agree_{col}"] = n
+        put(f"pct_agree_{col}", n, top_box(g[col]))
     return m
 
 
