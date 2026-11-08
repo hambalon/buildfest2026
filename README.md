@@ -30,7 +30,7 @@ it in the dashboard.
    You can also skip this and upload the file in the dashboard.
 4. **Double-click the launcher:**
    - macOS: `start_dashboard.command` (first time: right-click → Open → Open, to allow it)
-   - Windows: `start_dashboard.bat`
+   - Windows: `start_dashboard.bat` (if a blue "Windows protected your PC" box appears: **More info → Run anyway**)
 
    The first run installs everything (2–5 minutes). After that it opens in seconds. The
    dashboard opens in your browser at http://localhost:8501. Close the black terminal
@@ -139,6 +139,9 @@ Full definitions and statistical methods: [docs/METHODS.md](docs/METHODS.md).
 | A result says *thin* | It is based on 10–29 people: treat it as indicative, not conclusive |
 | A column looks wrong after a form change | Run `python scripts/verify_pipeline.py`, then set `COLUMN_OVERRIDES` in `src/config.py` |
 | macOS says the launcher "can't be opened" | Right-click `start_dashboard.command` → Open → Open |
+| Windows: the launcher window closes right away | Update to the latest version of this folder (an older launcher had a Windows-only bug). To read any error, open the folder in File Explorer, type `cmd` in the address bar, press Enter, then run `start_dashboard.bat` there |
+| Windows: the Microsoft Store opens instead of Python | Install Python from python.org, ticking **Add python.exe to PATH** |
+| Setup failed halfway (no internet, etc.) | Delete the `.venv` folder and run the launcher again |
 | Port 8501 busy | `streamlit run app.py --server.port 8502` |
 
 ## Project structure
