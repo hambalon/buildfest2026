@@ -231,3 +231,21 @@ errors or problems · what we verified manually and how · kept / changed / disc
   the dashboard on fake data, including a fake variant with grouped sessions, with filters, the
   flagged-only toggle and the download contents checked: 0 exceptions; rerun 4.1 s → 0.8 s. No
   headline number changed, so `crosscheck.py` was not needed. The AI saw no real-data results.
+
+---
+
+### 2026-11-08 · Claude Code (Claude Opus) · Presentation deck (`Team4_Presentation.pptx`)
+- **Prompt (summary):** make the PPTX for the BuildFest submission, following the competition brief
+  (deliverables, judging rubric) and the repo rules.
+- **Produced:** a 14-slide 16:9 deck generated with a script (pptxgenjs, native editable charts),
+  with speaker notes on every slide: question and answer → data and cleaning → before/after →
+  students vs adults → student trend and session spread → county within audience → 988 intent →
+  open-text themes → 5 prioritized recommendations → tool and implementation → AI use and errors →
+  limitations → close. Before/after colors match the dashboard (orange `#eb6834`, blue `#2a78d6`).
+- **Sources:** every number is copied from `docs/memo.md` or from aggregate tables in `outputs/`
+  (all groups n ≥ 10). No row-level data or open-text answers were read, and the deck has no quotes.
+- **Errors caught in visual review (slides rendered in PowerPoint):** a table rendered as an empty box
+  (wrong cell-margin units); a negative bar label overlapped its category label; stat numbers wrapped
+  inside their cards. All fixed and re-rendered.
+- **Verified:** OOXML validation passes; no personal names in slide text, notes or file metadata
+  (author = "Team 4"). Humans still need to check the numbers against the final memo before submitting.
