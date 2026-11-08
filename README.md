@@ -72,7 +72,9 @@ point carries its numbers, its n and a suggested action.
 
 The **sidebar** has filters (audience, language, county, role, training dates), an upload box
 (`.xlsx` or `.csv`) and **Download summary (Excel + CSV)**: privacy-safe tables for grant
-reports and board updates. Charts work in light and dark mode.
+reports and board updates. When a filter is on, a **Filtered view** note under the title lists it,
+and the download records the same filters (in `README.txt` and an `about` sheet), so a filtered
+export can't be mistaken for the full data. Charts work in light and dark mode.
 
 | Tab | Answers | Look for |
 |---|---|---|
@@ -80,7 +82,7 @@ reports and board updates. Charts work in light and dark mode.
 | **Knowledge gains** | Did self-rated knowledge rise on each statement? | Before vs. after % agree; % who rated themselves higher; ceiling note |
 | **Intent to call 988** | How likely are people to call, and does knowledge relate to intent? | The gap between those who do and don't agree they know when to use 988 |
 | **Audiences & communities** | Where does the training land less well? | Turn on **Split by audience** before comparing counties; read the plain-language test verdicts |
-| **Trends & sessions** | Is quality stable over time? Which sessions need follow-up? | Session scorecard flags (thresholds in `src/config.py`) |
+| **Trends & sessions** | Is quality stable over time? Which sessions need follow-up? | Session scorecard: flagged sessions first and shaded; *Thin* = under 30 responses, so a flag may be chance |
 | **Participant voice** | What did people value, and what would they change? | Compare students vs. adults |
 | **Data quality & methods** | Can the numbers be trusted? | Quality checks, robustness table, cleaning report, definitions |
 

@@ -9,6 +9,8 @@ aggregate; any group or metric answered by fewer than MIN_N people is hidden.
 """
 from __future__ import annotations
 
+import datetime as dt
+import hashlib
 import inspect
 import io
 import math
@@ -86,13 +88,16 @@ upload = st.sidebar.file_uploader(
          "Without an upload, the newest .xlsx/.csv in the data/ folder is used.")
 try:
     if upload is not None:
-        res = load_from_upload(upload.getvalue(), upload.name)
+        raw = upload.getvalue()
+        data_key = ("upload", upload.name, hashlib.sha1(raw).hexdigest())  # identifies the data for caching
+        res = load_from_upload(raw, upload.name)
     else:
         try:
             path = find_data_file()
         except FileNotFoundError:
             welcome()
-        res = load_from_path(str(path), path.stat().st_mtime)
+        data_key = ("file", str(path), path.stat().st_mtime)
+        res = load_from_path(*data_key[1:])
 except Exception as e:  # noqa: BLE001 - show a friendly message instead of a traceback
     st.title("988 Training Insights")
     st.error("This file could not be read as a 988 training survey export. Check that it is the "
@@ -123,6 +128,8 @@ def n_txt(n) -> str:
 # --------------------------------------------------------------------------- #
 st.sidebar.header("Filters")
 mask = pd.Series(True, index=df_all.index)
+active: list[str] = []     # human-readable description of each filter in use
+filter_key: list = []      # the same, hashable, for caching results per filter combination
 
 
 def pick(col: str, label: str, help: str | None = None) -> None:
@@ -133,6 +140,8 @@ def pick(col: str, label: str, help: str | None = None) -> None:
     chosen = st.sidebar.multiselect(label, opts, help=help)
     if chosen:
         mask &= df_all[col].isin(chosen)
+        active.append(f"{label}: {', '.join(map(str, chosen))}")
+        filter_key.append((col, tuple(map(str, chosen))))
 
 
 pick("audience", "Audience", "Students = anyone whose role includes 'Student'; everyone else is Adults.")
@@ -143,13 +152,19 @@ if "role_list" in df_all:
     chosen = st.sidebar.multiselect("Role (any of)", roles)
     if chosen:
         mask &= df_all["role_list"].map(lambda rs: any(r in chosen for r in rs))
+        active.append(f"Role: {', '.join(chosen)}")
+        filter_key.append(("role", tuple(chosen)))
 if "training_date" in df_all and df_all["training_date"].notna().any():
     d_min, d_max = df_all["training_date"].min().date(), df_all["training_date"].max().date()
     rng = st.sidebar.date_input("Training dates", (d_min, d_max), min_value=d_min, max_value=d_max)
     if isinstance(rng, (list, tuple)) and len(rng) == 2 and (rng[0], rng[1]) != (d_min, d_max):
         mask &= df_all["training_date"].dt.date.between(rng[0], rng[1])
+        active.append(f"Training dates: {rng[0]:%b %d, %Y} to {rng[1]:%b %d, %Y}")
+        filter_key.append(("date", rng[0].isoformat(), rng[1].isoformat()))
 
 df = df_all[mask]
+filter_key = tuple(filter_key)
+filters_text = "; ".join(active) if active else "None (all responses)"
 st.sidebar.caption(f"Data: **{res.source_file}** · {len(df_all):,} responses "
                    f"({len(df):,} in current view)")
 st.sidebar.info(f"**Privacy:** any group or number based on fewer than {C.MIN_N} people is hidden "
@@ -157,12 +172,19 @@ st.sidebar.info(f"**Privacy:** any group or number based on fewer than {C.MIN_N}
 
 if len(df) < C.MIN_N:
     st.title("988 Training Insights")
-    st.warning(f"Fewer than {C.MIN_N} responses match these filters, so results are hidden. "
-               "Remove a filter to see results.")
+    st.warning(f"Fewer than {C.MIN_N} responses match these filters ({filters_text}), so results are "
+               "hidden. Remove a filter to see results.")
     st.stop()
 
-tables = analyze.run_all(res, df)
-themes = text_themes.run_all(res, df)
+
+# Cached per data file + filter combination, so switching tabs or widgets doesn't redo the
+# whole analysis. Arguments starting with "_" are not hashed; the keys identify them.
+@st.cache_data(show_spinner="Calculating results…", max_entries=50)
+def compute(key_data: tuple, key_filters: tuple, _res, _df: pd.DataFrame):
+    return analyze.run_all(_res, _df), text_themes.run_all(_res, _df)
+
+
+tables, themes = compute(data_key, filter_key, res, df)
 ov = tables["overall"].set_index("metric")["value"]
 
 
@@ -241,6 +263,9 @@ dates = df["training_date"].dropna() if "training_date" in df else pd.Series(dty
 st.caption(f"{len(df):,} responses"
            + (f" · trainings from {dates.min():%b %d, %Y} to {dates.max():%b %d, %Y}" if len(dates) else "")
            + " · Retrospective survey: participants rated themselves before and after, at the end of the training.")
+if active:
+    st.info(f"**Filtered view:** {filters_text}. Every number below describes only these "
+            f"{len(df):,} of {len(df_all):,} responses, and so does the download.")
 
 # One source for the tab guide (Summary tab) and each tab's opening line.
 TAB_GUIDE = {
@@ -594,13 +619,23 @@ with tabs[4]:
     else:
         only = st.toggle("Show only flagged sessions", value=False)
         v = ses[ses["needs_follow_up"]] if only else ses
+        cols = ["date", "county", "n", "thin", "pct_students", "nps", "pct_agree_after",
+                "retro_change_mean", "pct_delivery", "n_988", "pct_likely_988", "flags"]
+        view = analyze.safe_table(v)[cols].reset_index(drop=True)
+        flagged = v["needs_follow_up"].to_numpy()
+        # Tint flagged rows; a translucent orange reads on both light and dark backgrounds.
+        styled = view.style.apply(
+            lambda row: ["background-color: rgba(235, 104, 52, 0.18)" if flagged[row.name] else ""] * len(row),
+            axis=1)
         st.dataframe(
-            analyze.safe_table(v)[["date", "county", "n", "pct_students", "nps", "pct_agree_after",
-                                   "retro_change_mean", "pct_delivery", "n_988", "pct_likely_988", "flags"]],
+            styled,
             hide_index=True, width="stretch",
             column_config={
                 "date": st.column_config.DateColumn("Date", format="MMM D, YYYY"),
                 "county": "County", "n": "Responses",
+                "thin": st.column_config.CheckboxColumn(
+                    "Thin", help=f"Fewer than {C.THIN_N} responses: a flag may just be chance. "
+                                 "Look for a pattern across sessions before acting."),
                 "pct_students": st.column_config.NumberColumn("% students", format="%.0f%%"),
                 "nps": st.column_config.NumberColumn("NPS", format="%+.0f"),
                 "pct_agree_after": st.column_config.NumberColumn("% agree after", format="%.0f%%"),
@@ -610,7 +645,10 @@ with tabs[4]:
                 "pct_likely_988": st.column_config.NumberColumn("% likely 988", format="%.0f%%"),
                 "flags": "Follow-up flags"})
         a = ses.attrs
-        st.caption(f"{int(ses['needs_follow_up'].sum())} of {len(ses)} sessions flagged. "
+        n_flag = int(ses["needs_follow_up"].sum())
+        n_flag_thin = int((ses["needs_follow_up"] & ses["thin"]).sum())
+        st.caption(f"{n_flag} of {len(ses)} sessions flagged (shown first, shaded)"
+                   + (f", {n_flag_thin} of them thin (under {C.THIN_N} responses)" if n_flag_thin else "") + ". "
                    f"{a.get('hidden_sessions', 0)} smaller sessions ({a.get('hidden_responses', 0)} responses) "
                    f"are not listed individually but are included in every other view. "
                    "Use flags as a prompt to talk with the facilitator, not as a verdict.")
@@ -678,8 +716,17 @@ with tabs[6]:
 # --------------------------------------------------------------------------- #
 # Download: aggregate tables only (never row-level data or open text)
 # --------------------------------------------------------------------------- #
-def build_download() -> bytes:
-    safe = analyze.safe_tables({**tables, **{f"themes_{k}": v for k, v in themes.items()}})
+@st.cache_data(show_spinner=False, max_entries=50)
+def build_download(key_data: tuple, key_filters: tuple, filters: str, n_view: int, n_all: int,
+                   _tables: dict, _themes: dict) -> bytes:
+    """Cached per data file + filters, so it isn't rebuilt on every click."""
+    created = dt.datetime.now().strftime("%Y-%m-%d %H:%M")
+    about = pd.DataFrame({"item": ["Filters", "Responses in this download", "Responses in the file",
+                                   "Created", "Privacy"],
+                          "value": [filters, f"{n_view:,}", f"{n_all:,}", created,
+                                    f"Counts below {C.MIN_N} shown as '{SMALL}'; no individual responses"]})
+    safe = {"about": about,
+            **analyze.safe_tables({**_tables, **{f"themes_{k}": v for k, v in _themes.items()}})}
     xlsx = io.BytesIO()
     analyze.write_excel(safe, xlsx)
     buf = io.BytesIO()
@@ -688,16 +735,19 @@ def build_download() -> bytes:
         for name, t in safe.items():
             z.writestr(f"csv/{name}.csv", t.to_csv(index=False))
         z.writestr("README.txt",
-                   "Aggregate tables from the 988 Training Insights dashboard for the filters that were "
-                   f"active when downloaded. Counts below {C.MIN_N} are shown as '{SMALL}' and those "
-                   "groups' results are blank. No individual responses are included.\n"
+                   "Aggregate tables from the 988 Training Insights dashboard.\n\n"
+                   f"Filters: {filters}\n"
+                   f"Responses in this download: {n_view:,} of {n_all:,}\n"
+                   f"Created: {created}\n\n"
+                   f"Counts below {C.MIN_N} are shown as '{SMALL}' and those groups' results are blank. "
+                   "No individual responses are included.\n"
                    "Definitions: docs/METHODS.md in the project folder.\n")
     return buf.getvalue()
 
 
 st.sidebar.download_button(
     "Download summary (Excel + CSV)",
-    data=build_download(),
+    data=build_download(data_key, filter_key, filters_text, len(df), len(df_all), tables, themes),
     file_name="988_training_summary.zip", mime="application/zip",
     help=f"Aggregate tables for the current filters. Counts under {C.MIN_N} are hidden. "
          "No individual responses are included. Good for grant reports.")

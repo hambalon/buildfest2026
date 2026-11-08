@@ -7,6 +7,10 @@
 > task:** one visual pass of the final version in light and dark mode (the earlier review covered the
 > previous version).
 >
+> **Update 2 (2026-11-08):** a *Filtered view* note lists active filters, and the download records
+> them; analysis and download are cached per file + filters (reruns ~5x faster); session scorecard
+> lists flagged sessions first (shaded) and marks *thin* sessions (n < 30).
+>
 > **Update (2026-11-08):** chart value labels now follow the light/dark theme; the Summary tab opens
 > with a guide to every tab, and each tab starts with its purpose; "What the data says" is grouped
 > (working / gaps / watch / caveats) with n, *thin* flags (n < 30) and suggested actions; CSV
@@ -55,9 +59,9 @@ DATA_FILE=outputs/FAKE_survey.xlsx streamlit run app.py   # fake data (safe to s
 - [x] **Themes tab:** hide themes with < 10 mentions or mark them.
 - [x] **Optional:** a "Download summary tables (CSV)" button that exports aggregates only.
       **Never offer row-level downloads.** *(Sidebar button: zip of aggregate CSVs, small counts as "<10".)*
-- [ ] **Optional:** an upload widget (`st.file_uploader`) as an alternative to `data/`.
+- [x] **Optional:** an upload widget (`st.file_uploader`) as an alternative to `data/`.
       If added, keep the uploaded file in memory only.
-- [ ] Never show raw open-text answers or row-level tables anywhere in the app.
+- [x] Never show raw open-text answers or row-level tables anywhere in the app.
 - [x] After changes: `python scripts/verify_pipeline.py` (includes the dashboard smoke test).
 
 ## Acceptance criteria

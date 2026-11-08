@@ -214,3 +214,20 @@ errors or problems · what we verified manually and how · kept / changed / disc
 - **Verified:** pytest 31/31 and `verify_pipeline.py` 0 fail on Python 3.9 and 3.14;
   `crosscheck.py` 12/12; every dashboard control 0 exceptions; dark-mode screenshots reviewed
   (fake data). The AI only read aggregate takeaways from the real file (n ≥ 10).
+
+---
+
+### 2026-11-08 · Claude Code (Claude Opus) · Dashboard: filter visibility, speed, session scorecard
+- **Prompt (summary):** suggest ways to improve the dashboard, then implement the top three.
+- **Produced:** (1) a *Filtered view* note under the title listing active filters, and the same
+  filters, response counts and date in the download (`README.txt` + an `about` sheet/CSV);
+  (2) `analyze.run_all` + themes and the download zip cached per data file + filter combination
+  (they were recomputed on every click); (3) session scorecard sorts flagged sessions first, shades
+  them, and adds a `thin` column (n < `THIN_N`) in `analyze.session_scorecard` and the dashboard.
+- **Error caught:** the first version named the cache-key arguments with a leading underscore,
+  which Streamlit excludes from the cache key (every filter would have shown the same cached
+  results). Renamed before testing.
+- **Verified:** pytest 31/31; `verify_pipeline.py` 0 fail (3 known D1 warnings); headless runs of
+  the dashboard on fake data, including a fake variant with grouped sessions, with filters, the
+  flagged-only toggle and the download contents checked: 0 exceptions; rerun 4.1 s → 0.8 s. No
+  headline number changed, so `crosscheck.py` was not needed. The AI saw no real-data results.

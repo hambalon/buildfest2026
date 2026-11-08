@@ -29,7 +29,7 @@ shows this page under **Data quality & methods**. Settings live in `src/config.p
 | **% likely to call 988** | Share scoring 7–10 on the 0–10 question (team decision D2) |
 | **Delivery rating** | Average % agree across the three delivery items |
 | **Session** | One training date in one county. Used for the session scorecard |
-| **Flagged session** | A session with 10+ responses where NPS < 0, knowledge % agree after < 85%, or delivery % agree < 80% (adjustable in `config.py`) |
+| **Flagged session** | A session with 10+ responses where NPS < 0, knowledge % agree after < 85%, or delivery % agree < 80% (adjustable in `config.py`). Listed first. Sessions under 30 responses are marked *thin*: with so few people one flag can be chance, so look for a repeated pattern before acting |
 
 ## 3. Statistical tests (`src/analyze.py`)
 
