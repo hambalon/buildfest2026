@@ -23,4 +23,7 @@
 - n = ___ responses, ___ to ___ (training dates)
 - Retrospective pre-test: self-report, recall bias, no control group
 - Groups with n < 10 suppressed; missing data handled per item
+- About 2% of answers to the three training-aspect items used two non-standard labels
+  ("Very agree", "Satisfied"), probably from an older form version. They were treated as
+  missing, because where "Satisfied" falls on an agree/disagree scale is unclear
 - Theme coding is keyword-based and validated on a hand-coded sample of ___

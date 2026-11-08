@@ -26,13 +26,13 @@ converts to the right number, and a human has spot-checked it against the raw Ex
 
 | WARN | Meaning | Action |
 |---|---|---|
-| aspect_01/02/03 unmapped labels (~23 answers each) | The three training-aspect items contain two non-standard labels, **"Very agree"** (14 respondents) and **"Satisfied"** (11 respondents), probably from an older form version. They are excluded (missing) for now. | **Team decision** (task D1 below) |
+| aspect_01/02/03 unmapped labels (~23 answers each) | The three training-aspect items contain two non-standard labels, **"Very agree"** (14 respondents) and **"Satisfied"** (11 respondents), probably from an older form version. They are excluded (missing). | **Decided (D1): option A**, kept as missing |
 | text_valuable / text_improve high % uncoded | Theme keywords were written before anyone read the answers | Stage 04 |
 
 ## Tasks
 
 ### Decisions (record each one in `docs/AI_LOG.md` and the memo's methods section)
-- [ ] **D1: Non-standard labels.** Option A (default): exclude as missing, about 2% of
+- [x] **D1: Non-standard labels.** *(Decided 2026-11-07: option A.)* Option A (default): exclude as missing, about 2% of
       those items. Option B: map "Very agree" to 5 and "Satisfied" to 4 by uncommenting
       the line in `AGREE_SCALE` in `src/config.py`. Recommendation: A. The ordering
       of "Satisfied" on an agree scale is ambiguous, and items 04–06 are secondary.

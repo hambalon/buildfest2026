@@ -30,6 +30,19 @@ errors or problems · what we verified manually and how · kept / changed / disc
 
 ---
 
+### 2026-11-07 · Claude Code (Claude Opus) · Decision D1: non-standard aspect labels
+- **Prompt (summary):** Reviewed `verify_pipeline.py` output (36 pass, 5 warn, 0 fail) and
+  explained the warnings. The team chose option A for D1.
+- **Produced:** No code change: `NONSTANDARD_AGREE_LABELS = {}` in `src/config.py` already
+  treats "Very agree" / "Satisfied" as missing. Added a line to the memo's methods section.
+- **Errors / hallucinations:** None. The AI read only code, TODO docs and verify output, not the data.
+- **Verified manually (how):** verify output shows ~23 unmapped answers per aspect item
+  (2 distinct labels), matching the counts documented in TODO/02.
+- **Decision:** Option A: exclude as missing (~2% of aspect_01-03). Reason: where "Satisfied"
+  falls on an agree scale is unclear, and the aspect items are secondary. The 3 aspect WARNs are expected.
+
+---
+
 ### YYYY-MM-DD · Tool · Short title
 - **Prompt (summary):**
 - **Produced:**
