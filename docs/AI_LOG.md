@@ -74,3 +74,25 @@ errors or problems · what we verified manually and how · kept / changed / disc
   The hook was tested by staging a dummy .csv; it was blocked.
 - **Note:** `text_improve` uncoded rose to ~80% once it stopped using the broad "988"
   pattern from the shared theme list. That's the more honest number; stage 04 fixes coverage.
+
+---
+
+### 2026-11-07 · Claude Code (Claude Opus) · Stage 05 dashboard polish
+- **Prompt (summary):** Do the stage 05 dashboard polish tasks from `TODO/05_dashboard.md`.
+- **Produced:** `SHORT_LABELS` in `src/config.py` (new section 3, display only); retro tab
+  "% improved" chart; n shown under the NPS / 988 / retro tiles; By group tooltip and caption
+  show the per-metric n (new `n_agree_*` columns in `analyze.by_group`) and bars with a blank
+  metric are hidden; themes with < 10 mentions hidden; sidebar "Download summary tables (CSV)"
+  zip with aggregate tables only, small counts shown as "<10".
+- **Errors found and fixed (gaps in the existing small-group rule under sidebar filters):**
+  the headline tiles, the overview "% agree" chart and the theme charts could show a value
+  based on fewer than 10 answers, and tables printed the small n itself. `analyze.overall()`
+  now blanks metrics with n < 10; the app hides those charts and shows "<10" for small counts.
+  The metric dropdown's `format_func` broke Streamlit's AppTest; the options are now the display names.
+- **Privacy note:** to write `SHORT_LABELS`, the AI printed the question headers (no answer
+  values) from the real file once. All other development and testing used `FAKE_survey.xlsx`.
+- **Verified:** `verify_pipeline.py` on the real file: 36 pass, 5 warn (known), 0 fail. An extra
+  AppTest run on fake data with a language, county and role filter, cycling all 30
+  group × metric combinations each time: 0 exceptions. Analysis CSVs are unchanged except
+  for the new `n_agree_*` columns.
+- **Still to do by a human:** visual review in light and dark theme (TODO/05, first box).
