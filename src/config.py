@@ -114,3 +114,18 @@ RETRO_PAIR_OVERRIDES: dict[str, str] = {}
 
 # Minimum sub-item text similarity (0-1) to auto-pair a before item with an after item.
 RETRO_PAIR_MIN_SIMILARITY = 0.45
+
+# =========================================================================== #
+# 3. DASHBOARD DISPLAY (labels only, no effect on any number)
+# =========================================================================== #
+
+# Short chart labels by clean column name. Columns not listed fall back to the
+# question text from the survey header (res.label()).
+SHORT_LABELS: dict[str, str] = {
+    "outcome_01": "Can identify mental health crises",
+    "outcome_02": "Can describe 988",
+    "outcome_03": "Know when to use 988",
+    "aspect_01": "Presenter engaged participants",
+    "aspect_02": "Presenter knew the subject",
+    "aspect_03": "Training well organized",
+}

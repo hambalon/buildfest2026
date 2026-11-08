@@ -29,21 +29,24 @@ DATA_FILE=outputs/FAKE_survey.xlsx streamlit run app.py   # fake data (safe to s
 ```
 
 ## Tasks
-- [ ] **Visual review** in a browser, light and dark theme (Settings → Theme). Check
-      label overlap, long question labels and empty charts.
-- [ ] **Shorten labels:** `res.label()` already strips the matrix stem. Long sub-items may
+- [x] **Visual review** in a browser, light and dark theme (Settings → Theme). Check
+      label overlap, long question labels and empty charts. *(Done 2026-11-07 on fake data: all
+      tabs, both themes, a county filter and the download button.)*
+- [x] **Shorten labels:** `res.label()` already strips the matrix stem. Long sub-items may
       still wrap. Consider a `SHORT_LABELS` dict in `config.py` (e.g., `outcome_02` → "Can describe 988").
-- [ ] **Retro tab:** add "% improved" per item as a second small chart or tile.
-- [ ] **988 tile:** the n is only ~293. Make it visible under the tile, not just in the tooltip.
-- [ ] **By group:** make sure the per-metric n is shown next to the chosen metric
+      *(Done: `SHORT_LABELS` in config.py section 3; full question stays in tooltips.)*
+- [x] **Retro tab:** add "% improved" per item as a second small chart or tile.
+- [x] **988 tile:** the n is only ~293. Make it visible under the tile, not just in the tooltip.
+      *(n is now shown under the NPS and retro tiles too.)*
+- [x] **By group:** make sure the per-metric n is shown next to the chosen metric
       (`n_988` when the metric is `pct_likely_988`, etc.) and hide bars where the metric is blank.
-- [ ] **Themes tab:** hide themes with < 10 mentions or mark them.
-- [ ] **Optional:** a "Download summary tables (CSV)" button that exports aggregates only.
-      **Never offer row-level downloads.**
+- [x] **Themes tab:** hide themes with < 10 mentions or mark them.
+- [x] **Optional:** a "Download summary tables (CSV)" button that exports aggregates only.
+      **Never offer row-level downloads.** *(Sidebar button: zip of aggregate CSVs, small counts as "<10".)*
 - [ ] **Optional:** an upload widget (`st.file_uploader`) as an alternative to `data/`.
       If added, keep the uploaded file in memory only.
 - [ ] Never show raw open-text answers or row-level tables anywhere in the app.
-- [ ] After changes: `python scripts/verify_pipeline.py` (includes the dashboard smoke test).
+- [x] After changes: `python scripts/verify_pipeline.py` (includes the dashboard smoke test).
 
 ## Acceptance criteria
 - 0 exceptions in `verify_pipeline.py`. Visually checked in both themes.
