@@ -21,9 +21,9 @@ from src import config as C
 from src.clean import CleanResult, group_small, load_and_clean, save_outputs
 
 try:
-    from scipy.stats import wilcoxon
+    from scipy.stats import kruskal, mannwhitneyu, wilcoxon
 except ImportError:  # scipy is optional; p-values are skipped without it
-    wilcoxon = None
+    kruskal = mannwhitneyu = wilcoxon = None
 
 
 # --------------------------------------------------------------------------- #
@@ -187,6 +187,129 @@ def by_group(res: CleanResult, group: str, df: pd.DataFrame | None = None) -> pd
     return out.round(2).reset_index(drop=True)
 
 
+# --------------------------------------------------------------------------- #
+# Robustness checks (stage 03)
+# --------------------------------------------------------------------------- #
+def _p(test, a: pd.Series, b: pd.Series) -> float:
+    a, b = a.dropna().astype(float), b.dropna().astype(float)
+    if test is None or len(a) < C.MIN_N or len(b) < C.MIN_N:
+        return float("nan")
+    try:
+        return float(test(a, b).pvalue)
+    except ValueError:  # e.g. all values identical
+        return float("nan")
+
+
+def subset_988(res: CleanResult, df: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Are the people who answered the 988 question (added to the form later) different
+    from everyone else? Compares recommend and retro change; Mann-Whitney U p-values."""
+    df = res.df if df is None else df
+    if "call_988" not in df:
+        return pd.DataFrame()
+    answered = df["call_988"].notna()
+    ch = person_retro_change(res, df)
+    parts = {"Answered 988 question": answered, "Did not answer 988 question": ~answered}
+    rows = []
+    for name, m in parts.items():
+        g, c = df[m], ch[m]
+        row = {"subset": name, "n": int(m.sum())}
+        if "recommend" in g:
+            r = g["recommend"].astype(float)
+            n_r = int(r.notna().sum())
+            row |= {"n_recommend": n_r,
+                    "recommend_mean": round(r.mean(), 2) if n_r >= C.MIN_N else float("nan"),
+                    "nps": round(nps(r), 1) if n_r >= C.MIN_N else float("nan")}
+        n_c = int(c.notna().sum())
+        row |= {"n_retro": n_c,
+                "retro_change_mean": round(c.mean(), 2) if n_c >= C.MIN_N else float("nan"),
+                "pct_improved": round((c.dropna() > 0).mean() * 100, 1) if n_c >= C.MIN_N else float("nan")}
+        rows.append(row)
+    out = pd.DataFrame(rows)
+    a, b = answered, ~answered
+    p = {"p_recommend": _p(mannwhitneyu, df.loc[a, "recommend"], df.loc[b, "recommend"])
+         if "recommend" in df else float("nan"),
+         "p_retro_change": _p(mannwhitneyu, ch[a], ch[b])}
+    for k, v in p.items():
+        out[k] = v  # same p on both rows (it compares the two)
+    return out
+
+
+def ceiling(res: CleanResult, df: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Share already at the top (5) before the training, who can't improve, and the
+    change among everyone else."""
+    df = res.df if df is None else df
+    rows = []
+    for rcol, lcol in res.retro_pairs.items():
+        if not lcol:
+            continue
+        pair = df[[rcol, lcol]].dropna().astype(float)
+        below = pair[pair[rcol] < 5]
+        d = below[lcol] - below[rcol]
+        ok = len(below) >= C.MIN_N
+        rows.append({
+            "item": lcol, "question_after": res.label(lcol), "n": len(pair),
+            "pct_at_5_before": round((pair[rcol] == 5).mean() * 100, 1) if len(pair) >= C.MIN_N else float("nan"),
+            "n_below_5_before": len(below),
+            "change_mean_below_5": round(d.mean(), 2) if ok else float("nan"),
+            "pct_improved_below_5": round((d > 0).mean() * 100, 1) if ok else float("nan"),
+        })
+    return pd.DataFrame(rows)
+
+
+def trend(res: CleanResult, df: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Monthly n, recommend mean and retro change. Months with n < MIN_N are dropped."""
+    df = res.df if df is None else df
+    if "training_date" not in df or df["training_date"].isna().all():
+        return pd.DataFrame()
+    month = pd.to_datetime(df["training_date"]).dt.to_period("M").astype("string")
+    ch = person_retro_change(res, df)
+    rows = []
+    for m, idx in df.groupby(month).groups.items():
+        g, c = df.loc[idx], ch.loc[idx]
+        if len(g) < C.MIN_N:
+            continue
+        n_c = int(c.notna().sum())
+        n_r = int(g["recommend"].notna().sum()) if "recommend" in g else 0
+        rows.append({"month": m, "n": len(g),
+                     "n_recommend": n_r,
+                     "recommend_mean": round(g["recommend"].astype(float).mean(), 2) if n_r >= C.MIN_N else float("nan"),
+                     "n_retro": n_c,
+                     "retro_change_mean": round(c.mean(), 2) if n_c >= C.MIN_N else float("nan")})
+    return pd.DataFrame(rows).sort_values("month").reset_index(drop=True) if rows else pd.DataFrame()
+
+
+def group_tests(res: CleanResult, df: pd.DataFrame | None = None) -> pd.DataFrame:
+    """Kruskal-Wallis test of retro change across groups with n >= MIN_N.
+    Pooled "Other" and "Not reported" groups are left out (they are not one group)."""
+    from src.clean import NOT_REPORTED, SMALL_GROUP
+    df = res.df if df is None else df
+    ch = person_retro_change(res, df).rename("change")
+    rows = []
+    for group in ("county", "role", "language"):
+        if group == "role":
+            if "role_list" not in df:
+                continue
+            ex = df[["role_list"]].join(ch).explode("role_list").rename(columns={"role_list": "g"})
+        else:
+            col = f"{group}_grp"
+            if col not in df:
+                continue
+            ex = df[[col]].join(ch).rename(columns={col: "g"})
+        ex = ex.dropna(subset=["g", "change"])
+        ex = ex[~ex["g"].isin([NOT_REPORTED, SMALL_GROUP, ""])]
+        samples = [s["change"] for _, s in ex.groupby("g") if len(s) >= C.MIN_N]
+        row = {"grouping": group, "groups_tested": len(samples),
+               "n": int(sum(len(s) for s in samples)), "H": float("nan"), "p": float("nan")}
+        if kruskal is not None and len(samples) >= 2:
+            try:
+                r = kruskal(*samples)
+                row |= {"H": round(float(r.statistic), 2), "p": float(r.pvalue)}
+            except ValueError:
+                pass
+        rows.append(row)
+    return pd.DataFrame(rows)
+
+
 def run_all(res: CleanResult) -> dict[str, pd.DataFrame]:
     return {
         "overall": overall(res),
@@ -194,6 +317,10 @@ def run_all(res: CleanResult) -> dict[str, pd.DataFrame]:
         "by_county": by_group(res, "county"),
         "by_role": by_group(res, "role"),
         "by_language": by_group(res, "language"),
+        "subset_988": subset_988(res),
+        "ceiling": ceiling(res),
+        "trend_monthly": trend(res),
+        "group_tests": group_tests(res),
     }
 
 

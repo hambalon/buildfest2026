@@ -135,3 +135,23 @@ errors or problems · what we verified manually and how · kept / changed / disc
   (default kept; it is the plain reading of "likely" above the midpoint, and 9–10 would mean
   "very likely"). "None"/"N/A" open-text answers are kept as answers. The AI recommended both
   defaults; a human made the call.
+
+---
+
+### 2026-11-07 · Claude Code (Claude Opus) · Stage 03 analysis and findings draft
+- **Prompt (summary):** Do stage 03: run the analysis and write the findings note.
+- **Produced:** four new aggregate tables in `src/analyze.py`: `subset_988` (988 answerers vs
+  others, Mann-Whitney U), `ceiling` (% already at 5 before; change among the rest),
+  `trend_monthly` (months with n ≥ 10 only) and `group_tests` (Kruskal-Wallis on retro change
+  by county / role / language). Draft findings 1–7 and three limitations in `docs/memo.md`.
+  County names are now shown without "County" so labels are consistent.
+- **What the AI saw:** only the aggregate CSVs in `outputs/` (never `survey_clean.csv`), read
+  through a filter that showed every count under 10 as "<10". A script first confirmed which
+  tables contained visible counts under 10 (`by_county` and `by_role` per-metric n's); those
+  were masked before display.
+- **Errors / judgment calls:** the overall % agree for the three aspect items is not a column in
+  any table. The AI derived it as the n-weighted average of the two language groups (which
+  together cover all 1,299). **Hand-check these.** The "shift toward student audiences" reading
+  of the monthly trend is a hypothesis, not tested, and the memo says so.
+- **Verified:** `verify_pipeline.py`: 36 pass, 5 warn (known), 0 fail. Human hand-check of 3
+  numbers in Excel: *pending*.

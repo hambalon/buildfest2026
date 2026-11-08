@@ -41,7 +41,7 @@ TEXT_ANSWER_TOKENS = {"none", "n/a", "na", "not applicable"}
 
 # County spelling variants are merged automatically: case is ignored and a trailing
 # "County"/"Co." or a leading "Condado de" is dropped, so "Montgomery County" and
-# "montgomery" become one group, shown under its most common spelling.
+# "montgomery" become one group, shown under its most common spelling without "County".
 # For other variants, map lowercase key -> lowercase key, e.g. {"pg": "prince george's"}.
 COUNTY_ALIASES: dict[str, str] = {}
 
