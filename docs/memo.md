@@ -8,7 +8,7 @@
 ## Bottom line (2–3 sentences)
 
 ## Key findings
-<!-- Stage 03 draft (2026-11-07) from outputs/*.csv. Hand-check 3 numbers before final. -->
+<!-- Stage 03 (2026-11-07) from outputs/*.csv. NPS, % likely 988 and outcome_03 % agree hand-checked in Excel. -->
 1. **Before → after change (retrospective items, n = 1,299):** participants reported higher
    knowledge after the training on all three items. The biggest gains were on 988 itself:
    - "I can describe 988 and how it works": 46% → 90% agree; 66% rated themselves higher

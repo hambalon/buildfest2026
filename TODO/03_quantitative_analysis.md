@@ -42,7 +42,8 @@ Only 293 people answered 988 overall.**
       Use only months with n≥10.
 - [x] **Optional: ceiling check.** Share of people already at 5 "before". They can't
       improve, so mean change understates the effect for them.
-- [ ] Sanity-check 3 numbers by hand in Excel (e.g., overall % agree for `outcome_03` and
+- [x] Sanity-check 3 numbers by hand in Excel *(Done 2026-11-07: NPS +12, % likely 988 73%,
+      % agree outcome_03 after 92.3%; all match.)* (e.g., overall % agree for `outcome_03` and
       NPS). Record this in `docs/AI_LOG.md`.
 
 *Done 2026-11-07: findings 1–7 are in `docs/memo.md`. New tables from `python -m src.analyze`:

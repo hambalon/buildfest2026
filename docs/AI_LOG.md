@@ -153,5 +153,6 @@ errors or problems · what we verified manually and how · kept / changed / disc
   any table. The AI derived it as the n-weighted average of the two language groups (which
   together cover all 1,299). **Hand-check these.** The "shift toward student audiences" reading
   of the monthly trend is a hypothesis, not tested, and the memo says so.
-- **Verified:** `verify_pipeline.py`: 36 pass, 5 warn (known), 0 fail. Human hand-check of 3
-  numbers in Excel: *pending*.
+- **Verified:** `verify_pipeline.py`: 36 pass, 5 warn (known), 0 fail. Human hand-check in the
+  raw Excel with COUNTIF formulas: NPS +12 (n = 1,266), % likely to call 988 = 73% (n = 293),
+  % agree "I know when to use 988" after = 92.3% (n = 1,299). All three match.
