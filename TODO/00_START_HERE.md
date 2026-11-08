@@ -73,9 +73,10 @@ Source: `data/BuildFest_EveryMind_Survey_Data_FULL.xlsx`. A Microsoft Forms expo
 |---|---|---|---|---|
 | *(ignored)* | Id, Start time, Completion time | – | – | Platform metadata |
 | `language`, `language_grp` | Survey language | text | all | English (US) or Español (México) |
-| `role`, `role_list` | "Are you a....?" | text; list | all | Multi-select (4 roles; a few people chose >1) |
+| `role`, `role_list` | "Are you a....?" | text; list | all | Multi-select (4 roles; 14 people chose >1) |
+| `audience` | Derived from role | Students / Adults | all | Students = role contains "student" (~83%). The main comparison in every view |
 | `training_date` | Date of the training | date | nearly all | |
-| `county`, `county_grp` | County the training was affiliated with | text | all | 10 counties; small ones folded into "Other (n<10)" in `county_grp` |
+| `county`, `county_grp` | County the training was affiliated with | text | all | Spelling variants merged → 7 counties; 3 with n<10 are pooled as "Other (n<10)" in `county_grp` |
 | `outcome_01` | I can identify mental health challenges and crises. | 1–5 | all | After-training rating |
 | `outcome_02` | I can describe 988 and how it works. | 1–5 | all | |
 | `outcome_03` | I know when to use 988. | 1–5 | all | |
@@ -87,8 +88,11 @@ Source: `data/BuildFest_EveryMind_Survey_Data_FULL.xlsx`. A Microsoft Forms expo
 | `aspect_03` | The training was well organized. | 1–5 | ~86% | |
 | `recommend`, `nps_group` | Likelihood to recommend the training | 0–10; category | ~97% | NPS = %9–10 − %0–6 |
 | `call_988` | Likelihood to call 988 if they or someone else is in crisis | **0–10** | **~23% (≈290)** | Probably added to the form later. Always show n |
-| `text_valuable` | What was the most valuable thing you learned during the training? | text | ~82% | Open text |
-| `text_improve` | How can we improve this training in the future? | text | ~49% | Open text |
+| `text_valuable` | What was the most valuable thing you learned during the training? | text | ~82% (1,063) | Open text |
+| `text_improve` | How can we improve this training in the future? | text | ~50% (651) | Open text. "None"/"N/A" count as answers ("nothing to change") |
+
+Current results (2026-11-08): see `docs/memo.md`. Headline: knowledge goals met (90–92% agree after);
+students (83%) rate the training far lower than adults (NPS −2 vs +80), and student scores fell each quarter.
 
 Naming rule: an agree/disagree item with a "before" version is `outcome_NN` and its
 before version is `before_NN` (same NN). Agree items without one are `aspect_NN`.
@@ -99,13 +103,21 @@ Coding: Strongly disagree 1 … Strongly agree 5. "% agree" means 4 or 5.
 ```
 AGENTS.md / CLAUDE.md   Rules for AI coding tools (auto-read by Claude Code, Cursor, Copilot, etc.)
 src/config.py           Section 1 = TEAM DECISIONS; section 2 = how to read the file
-src/clean.py            load_and_clean() -> CleanResult(df, column_map, likert_cols, retro_pairs,
+src/clean.py            load_and_clean(path | bytes) -> CleanResult(df, column_map, likert_cols, retro_pairs,
                         text_cols, call_988_scale, report); res.label(col) = question text
-src/analyze.py          overall(), retro_change(), by_group(res, "county"|"role"|"language"), run_all()
-src/text_themes.py      THEMES library + THEMES_BY_COLUMN; theme_summary(series, column); run_all()
-app.py                  Streamlit dashboard (streamlit run app.py)
+src/analyze.py          overall, retro_change, by_group(res, "audience"|"county"|"role"|"language", split=),
+                        group_tests, trend, intent_gap, session_scorecard, quality_checks, sensitivity,
+                        subset_988, ceiling; run_all(); safe_table()/export_tables() for sharing
+src/text_themes.py      VALUABLE / IMPROVE theme rules (THEMES_BY_COLUMN); theme_summary; theme_by_group
+src/insights.py         Plain-language takeaways for the dashboard Summary tab
+app.py                  Streamlit dashboard, 7 tabs (streamlit run app.py, or start_dashboard.command/.bat)
+docs/METHODS.md         Definitions, tests, privacy rules, limitations (also shown in the dashboard)
 scripts/verify_pipeline.py  Structural checks only. Output is safe to share
+scripts/crosscheck.py       Independent recomputation of 12 headline numbers from the raw Excel
+scripts/validate_themes.py  Blind human check of the theme coder (sample / score)
+scripts/build_deliverables.py  Builds TeamN_Memo.pdf, TeamN_AIAppendix.pdf, TeamN_TechnicalArtifact.zip with checks
 scripts/make_fake_data.py   Fake file with the same layout. Use it for AI-assisted dev
+tests/                  pytest suite on fake data (python -m pytest -q)
 .githooks/pre-commit    Blocks data files and notebook outputs from being committed
 ```
 

@@ -1,5 +1,9 @@
 # Stage 06: Memo → `Team#_Memo.pdf`
 
+> **Status (2026-11-08): DONE (pending final read).** `docs/memo.md` is final: 2 pages with all five required
+> sections (findings, methodology, recommendations, implementation, limitations). Build the PDF with
+> `python scripts/build_deliverables.py --team N`. It enforces the 2-page limit and checks for placeholders and names.
+
 **Starting point (2026-11-07):** placeholder at [../docs/memo.md](../docs/memo.md). **Depends on:** 03, 04.
 **Read first:** [00_START_HERE.md](00_START_HERE.md)
 

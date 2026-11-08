@@ -1,5 +1,11 @@
 # Stage 10: Technical Artifact and Final Submission
 
+> **Status (2026-11-08):** `python scripts/build_deliverables.py --team N --forbid "Name One,Name Two"`
+> builds the memo PDF, the appendix PDF and `TeamN_TechnicalArtifact.zip` (repo files only, no data,
+> no outputs, no git history) into `submission/`, and fails if a page limit, placeholder, name or
+> e-mail check fails. The zip solves the git-history anonymity problem below (option B). Upload the
+> files, set links to "Anyone with the link can view", and test them in a private window.
+
 **Depends on:** all stages. **Deadline: Sunday, November 8, 2026, 9:00 AM ET.** Aim to
 finish by 8:00 AM. **Read first:** [00_START_HERE.md](00_START_HERE.md)
 

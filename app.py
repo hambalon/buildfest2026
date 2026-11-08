@@ -1,87 +1,92 @@
-"""BuildFest 2026: EveryMind 988 training survey dashboard.
+"""988 Training Insights: dashboard for EveryMind's 988 training survey.
 
 Run from the repo root:
-    streamlit run app.py
+    streamlit run app.py          (or double-click start_dashboard.command / .bat)
 
-Reads the newest .xlsx in data/ every time that file changes, so dropping in an
-updated export needs no code changes. Groups with n < MIN_N are suppressed.
+Data: the newest .xlsx in data/, or a file uploaded in the sidebar (read in memory,
+never saved). A new export needs no code changes. Every number shown is an
+aggregate; any group or metric answered by fewer than MIN_N people is hidden.
 """
 from __future__ import annotations
 
+import inspect
 import io
 import math
+import sys
 import zipfile
+from pathlib import Path
 
 import altair as alt
 import pandas as pd
 import streamlit as st
 
-from src import analyze, text_themes
-from src import config as C
-from src.clean import find_data_file, load_and_clean
+sys.path.insert(0, str(Path(__file__).resolve().parent))  # find src/ on every Streamlit version
+from src import analyze, insights, text_themes  # noqa: E402
+from src import config as C  # noqa: E402
+from src.clean import NOT_REPORTED, find_data_file, load_and_clean  # noqa: E402
 
-# Validated categorical slots (colorblind-safe adjacent pair) + text ink.
-BLUE, ORANGE = "#2a78d6", "#eb6834"
+ROOT = Path(__file__).resolve().parent
 SMALL = f"<{C.MIN_N}"
+# Colorblind-validated categorical colors (see docs/METHODS.md, "Charts").
+BLUE, ORANGE, GRAY = "#2a78d6", "#eb6834", "#a3a19a"
+AUDIENCE_COLORS = {"Students": "#6250d6", "Adults": "#1baf7a"}
+NPS_COLORS = {"Detractor (0-6)": "#b7d3f6", "Passive (7-8)": "#5598e7", "Promoter (9-10)": "#184f95"}
 
-st.set_page_config(page_title="988 Training Survey", layout="wide")
-
-
-@st.cache_data(show_spinner="Cleaning survey data…")
-def _load(path: str, mtime: float):
-    # mtime is part of the cache key, so an updated file is re-read automatically
-    return load_and_clean(path)
-
-
-def bar(df, x, y, tooltip, color=BLUE, horizontal=True, x_title=None, y_title=None, domain=None):
-    scale = alt.Scale(domain=domain) if domain else alt.Undefined
-    enc_val = (alt.X(f"{x}:Q", title=x_title, scale=scale) if horizontal
-               else alt.Y(f"{y}:Q", title=y_title, scale=scale))
-    enc_cat = (alt.Y(f"{y}:N", sort="-x", title=y_title) if horizontal
-               else alt.X(f"{x}:O", title=x_title))
-    return (alt.Chart(df).mark_bar(color=color, cornerRadiusEnd=4)
-            .encode(enc_val, enc_cat, tooltip=tooltip)
-            .properties(height=alt.Step(28) if horizontal else 300))
-
-
-def is_blank(v) -> bool:
-    return v is None or (isinstance(v, float) and math.isnan(v)) or v is pd.NA
-
-
-def hide_small_counts(t: pd.DataFrame) -> pd.DataFrame:
-    """Replace any count below MIN_N in n / n_* columns with "<10"."""
-    t = t.copy()
-    for c in [c for c in t.columns if c == "n" or c.startswith("n_")]:
-        num = pd.to_numeric(t[c], errors="coerce")
-        out = num.round().astype("Int64").astype("string")
-        out[num < C.MIN_N] = SMALL
-        if "suppressed" in t:
-            out[t["suppressed"].astype(bool)] = SMALL if c == "n" else pd.NA
-        t[c] = out
-    return t
-
-
-def overall_safe(ov: pd.DataFrame) -> pd.DataFrame:
-    """Headline table with small n's shown as "<10"."""
-    ov = ov.copy()
-    ov["value"] = ov["value"].astype(object)
-    is_n = ov["metric"].str.contains(": n ") | (ov["metric"] == "Responses")
-    small = is_n & (pd.to_numeric(ov["value"], errors="coerce") < C.MIN_N)
-    ov.loc[small, "value"] = SMALL
-    return ov
+st.set_page_config(page_title="988 Training Insights", layout="wide")
+st.markdown("""<style>
+div[data-testid="stMetricValue"] {font-size: 1.9rem;}
+div[data-testid="stCaptionContainer"] p {margin-bottom: 0.2rem;}
+</style>""", unsafe_allow_html=True)
 
 
 # --------------------------------------------------------------------------- #
-# Load
+# Loading
 # --------------------------------------------------------------------------- #
-try:
-    path = find_data_file()
-except FileNotFoundError as e:
-    st.title("988 Training Survey")
-    st.error(str(e))
+@st.cache_data(show_spinner="Reading and cleaning the survey…")
+def load_from_path(path: str, mtime: float):
+    return load_and_clean(path)  # mtime is in the cache key so an updated file reloads
+
+
+@st.cache_data(show_spinner="Reading and cleaning the uploaded file…")
+def load_from_upload(data: bytes, name: str):
+    return load_and_clean(data, name=name)
+
+
+def welcome() -> None:
+    st.title("988 Training Insights")
+    st.info("No survey file found yet.")
+    st.markdown(f"""
+**To get started, either:**
+1. Upload the Microsoft Forms export (.xlsx) with **Use a different survey export** in the sidebar, or
+2. Save the export into the `data/` folder (`{C.DATA_DIR}`) and refresh this page.
+
+The file is read on this computer only. See *README.md → Updating the data* for how to export it.
+""")
     st.stop()
 
-res = _load(str(path), path.stat().st_mtime)
+
+st.sidebar.title("988 Training Insights")
+upload = st.sidebar.file_uploader(
+    "Use a different survey export (.xlsx)", type=["xlsx"],
+    help="Optional. The file is read in memory on this computer and never saved. "
+         "Without an upload, the newest .xlsx in the data/ folder is used.")
+try:
+    if upload is not None:
+        res = load_from_upload(upload.getvalue(), upload.name)
+    else:
+        try:
+            path = find_data_file()
+        except FileNotFoundError:
+            welcome()
+        res = load_from_path(str(path), path.stat().st_mtime)
+except Exception as e:  # noqa: BLE001 - show a friendly message instead of a traceback
+    st.title("988 Training Insights")
+    st.error("This file could not be read as a 988 training survey export. Check that it is the "
+             "Microsoft Forms .xlsx export (one sheet, one row per response).")
+    with st.expander("Technical details"):
+        st.code(f"{type(e).__name__}: {e}")
+    st.stop()
+
 df_all = res.df
 
 
@@ -89,251 +94,544 @@ def lbl(col: str) -> str:
     return C.SHORT_LABELS.get(col, res.label(col))
 
 
+def is_blank(v) -> bool:
+    return v is None or v is pd.NA or (isinstance(v, float) and math.isnan(v))
+
+
+def n_txt(n) -> str:
+    return SMALL if is_blank(n) or n < C.MIN_N else f"{int(n):,}"
+
+
 # --------------------------------------------------------------------------- #
-# Sidebar filters
+# Filters
 # --------------------------------------------------------------------------- #
 st.sidebar.header("Filters")
-st.sidebar.caption(f"Data file: `{res.source_file}` · {len(df_all):,} responses")
-
 mask = pd.Series(True, index=df_all.index)
-for col, label in [("language_grp", "Language"), ("county_grp", "County")]:
-    if col in df_all:
-        opts = sorted(df_all[col].dropna().unique())
-        picked = st.sidebar.multiselect(label, opts)
-        if picked:
-            mask &= df_all[col].isin(picked)
+
+
+def pick(col: str, label: str, help: str | None = None) -> None:
+    global mask
+    if col not in df_all:
+        return
+    opts = sorted(df_all[col].dropna().unique())
+    chosen = st.sidebar.multiselect(label, opts, help=help)
+    if chosen:
+        mask &= df_all[col].isin(chosen)
+
+
+pick("audience", "Audience", "Students = anyone whose role includes 'Student'; everyone else is Adults.")
+pick("language_grp", "Survey language")
+pick("county_grp", "County", f"Counties with fewer than {C.MIN_N} responses are pooled as '{SMALL} other'.")
 if "role_list" in df_all:
     roles = sorted({r for rs in df_all["role_list"] for r in rs})
-    picked = st.sidebar.multiselect("Role (any of)", roles)
-    if picked:
-        mask &= df_all["role_list"].map(lambda rs: any(r in picked for r in rs))
+    chosen = st.sidebar.multiselect("Role (any of)", roles)
+    if chosen:
+        mask &= df_all["role_list"].map(lambda rs: any(r in chosen for r in rs))
+if "training_date" in df_all and df_all["training_date"].notna().any():
+    d_min, d_max = df_all["training_date"].min().date(), df_all["training_date"].max().date()
+    rng = st.sidebar.date_input("Training dates", (d_min, d_max), min_value=d_min, max_value=d_max)
+    if isinstance(rng, (list, tuple)) and len(rng) == 2 and (rng[0], rng[1]) != (d_min, d_max):
+        mask &= df_all["training_date"].dt.date.between(rng[0], rng[1])
 
 df = df_all[mask]
-st.sidebar.info(f"Groups with fewer than **{C.MIN_N}** responses are hidden "
-                "to protect anonymity and avoid unstable numbers.")
-
-st.title("988 Training Survey")
-st.caption(f"{len(df):,} responses in current view")
+st.sidebar.caption(f"Data: **{res.source_file}** · {len(df_all):,} responses "
+                   f"({len(df):,} in current view)")
+st.sidebar.info(f"**Privacy:** any group or number based on fewer than {C.MIN_N} people is hidden "
+                f"and shown as “{SMALL}”. No individual responses are displayed or downloadable.")
 
 if len(df) < C.MIN_N:
-    st.warning(f"Fewer than {C.MIN_N} responses match these filters, so results are hidden.")
+    st.title("988 Training Insights")
+    st.warning(f"Fewer than {C.MIN_N} responses match these filters, so results are hidden. "
+               "Remove a filter to see results.")
     st.stop()
 
-# Aggregate tables for the current view (also used by the download button).
-ov_tbl = analyze.overall(res, df)
-rc = analyze.retro_change(res, df)
-group_tbls = {g: analyze.by_group(res, g, df) for g in ("county", "role", "language")}
-theme_tbls = {col: text_themes.theme_summary(df[col], col) for col in res.text_cols}
+tables = analyze.run_all(res, df)
+themes = text_themes.run_all(res, df)
+ov = tables["overall"].set_index("metric")["value"]
 
-tab_over, tab_retro, tab_group, tab_text, tab_quality = st.tabs(
-    ["Overview", "Before vs. after", "By group", "Open-text themes", "Data quality"])
 
 # --------------------------------------------------------------------------- #
-# Overview
+# Chart helpers
 # --------------------------------------------------------------------------- #
-with tab_over:
-    ov = ov_tbl.set_index("metric")["value"]
+def hbar(data: pd.DataFrame, x: str, y: str, *, title: str, tooltip: list, color: str = BLUE,
+         domain=None, fmt: str = ".0f", suffix: str = "", sort="-x", color_map: dict | None = None
+         ) -> alt.LayerChart:
+    """Horizontal bars with a direct value label at the end of each bar. color_map
+    colors each bar by its category (the axis label names it, so no legend)."""
+    base = alt.Chart(data).encode(y=alt.Y(f"{y}:N", sort=sort, title=None, axis=alt.Axis(labelLimit=360)))
+    scale = alt.Scale(domain=domain) if domain else alt.Undefined
+    enc = dict(x=alt.X(f"{x}:Q", title=title, scale=scale), tooltip=tooltip)
+    if color_map:
+        enc["color"] = alt.Color(f"{y}:N", legend=None, scale=alt.Scale(
+            domain=list(color_map), range=list(color_map.values())))
+    bars = base.mark_bar(color=color, cornerRadiusEnd=4).encode(**enc)
+    text = base.mark_text(align="left", dx=4).transform_calculate(
+        _label=f"format(datum['{x}'], '{fmt}') + '{suffix}'").encode(x=f"{x}:Q", text="_label:N")
+    return (bars + text).properties(height=alt.Step(30))
 
-    def tile(col, title, key, fmt, n_key=None, help=None):
-        if key not in ov:
-            return
-        v = ov[key]
-        col.metric(title, "n<10" if is_blank(v) else fmt(v), help=help)
-        if n_key and n_key in ov:
-            n = int(ov[n_key])
-            col.caption(f"n = {n:,} answered" if n >= C.MIN_N else f"n < {C.MIN_N} answered")
 
-    cols = st.columns(4)
-    cols[0].metric("Responses", f"{int(ov['Responses']):,}")
-    tile(cols[1], "Net Promoter Score", "Net Promoter Score", lambda v: f"{v:+.0f}",
-         "Recommend: n answered", "% scoring 9-10 minus % scoring 0-6")
-    tile(cols[2], "Likely to call 988", "Likely to call 988: % likely", lambda v: f"{v:.0f}%",
-         "Likely to call 988: n answered",
-         (f"Scored {C.CALL_988_LIKELY_MIN_0_10}-10 on a 0-10 scale. "
-          if res.call_988_scale == "0-10" else "Likely or very likely. ")
-         + "Only some respondents were asked this question.")
-    tile(cols[3], "Avg. change, before → after", "Retro change: mean points (1-5 scale)",
-         lambda v: f"{v:+.2f} pts", "Retro change: n with any pair",
-         "Average of (after − before) across retrospective items, 1-5 scale")
+def grouped_hbar(data: pd.DataFrame, x: str, y: str, series: str, colors: dict, *, title: str,
+                 tooltip: list, domain=None, fmt: str = ".0f", suffix: str = "", sort=None) -> alt.LayerChart:
+    order = list(colors)
+    base = alt.Chart(data).encode(
+        y=alt.Y(f"{y}:N", title=None, sort=sort, axis=alt.Axis(labelLimit=360)),
+        yOffset=alt.YOffset(f"{series}:N", sort=order))
+    scale = alt.Scale(domain=domain) if domain else alt.Undefined
+    bars = base.mark_bar(cornerRadiusEnd=3).encode(
+        x=alt.X(f"{x}:Q", title=title, scale=scale),
+        color=alt.Color(f"{series}:N", title=None, sort=order,
+                        scale=alt.Scale(domain=order, range=[colors[k] for k in order]),
+                        legend=alt.Legend(orient="top")),
+        tooltip=tooltip)
+    text = base.mark_text(align="left", dx=4, fontSize=11).transform_calculate(
+        _label=f"format(datum['{x}'], '{fmt}') + '{suffix}'").encode(x=f"{x}:Q", text="_label:N")
+    return (bars + text).properties(height=alt.Step(17))
 
-    if "recommend" in df and df["recommend"].notna().sum() >= C.MIN_N:
-        st.subheader("How likely to recommend the training (0-10)")
-        dist = (df["recommend"].dropna().astype(int).value_counts()
-                .reindex(range(11), fill_value=0).rename_axis("score").reset_index(name="count"))
-        st.altair_chart(bar(dist, "score", "count", ["score", "count"], horizontal=False,
-                            x_title="Score", y_title="Responses"), width="stretch")
 
-    if res.likert_cols:
-        st.subheader("% agree or strongly agree")
-        lk = pd.DataFrame([{"question": lbl(c), "full question": res.label(c),
-                            "pct": analyze.top_box(df[c]), "n": int(df[c].notna().sum())}
-                           for c in res.likert_cols])
-        shown_lk = lk[lk["n"] >= C.MIN_N]
-        if len(shown_lk):
-            st.altair_chart(bar(shown_lk, "pct", "question",
-                                ["full question", alt.Tooltip("pct:Q", format=".1f", title="% agree"), "n"],
-                                x_title="% agree", y_title=None, domain=[0, 100]), width="stretch")
-        if len(shown_lk) < len(lk):
-            st.caption(f"{len(lk) - len(shown_lk)} item(s) hidden because fewer than "
-                       f"{C.MIN_N} people answered.")
+def lines(data: pd.DataFrame, x: str, y: str, series: str, colors: dict, *, title: str,
+          tooltip: list, domain=None) -> alt.LayerChart:
+    order = [k for k in colors if k in set(data[series])]
+    scale = alt.Scale(domain=domain) if domain else alt.Scale(zero=False)
+    enc = dict(x=alt.X(f"{x}:O", title=None, axis=alt.Axis(labelAngle=0)),
+               y=alt.Y(f"{y}:Q", title=title, scale=scale),
+               color=alt.Color(f"{series}:N", title=None, sort=order,
+                               scale=alt.Scale(domain=order, range=[colors[k] for k in order]),
+                               legend=alt.Legend(orient="top")))
+    line = alt.Chart(data).mark_line(strokeWidth=2).encode(**enc)
+    pts = alt.Chart(data).mark_point(size=70, filled=True).encode(**enc, tooltip=tooltip)
+    return (line + pts).properties(height=320)
 
-    with st.expander("All headline numbers"):
-        st.dataframe(overall_safe(ov_tbl), hide_index=True, width="stretch")
+
+_CHART_HAS_WIDTH = "width" in inspect.signature(st.altair_chart).parameters
+
+
+def show(chart) -> None:
+    # Streamlit >= 1.5x uses width="stretch"; 1.50 (newest for Python 3.9) uses use_container_width.
+    if _CHART_HAS_WIDTH:
+        st.altair_chart(chart, width="stretch")
+    else:
+        st.altair_chart(chart, use_container_width=True)
+
+
+def p_text(p) -> str:
+    return "" if is_blank(p) else ("p < 0.001" if p < 0.001 else f"p = {p:.3f}")
+
 
 # --------------------------------------------------------------------------- #
-# Before vs after
+# Header + tabs
 # --------------------------------------------------------------------------- #
-with tab_retro:
+st.title("988 Training Insights")
+dates = df["training_date"].dropna() if "training_date" in df else pd.Series(dtype="datetime64[ns]")
+st.caption(f"{len(df):,} responses"
+           + (f" · trainings from {dates.min():%b %d, %Y} to {dates.max():%b %d, %Y}" if len(dates) else "")
+           + " · Retrospective survey: participants rated themselves before and after, at the end of the training.")
+
+tabs = st.tabs(["Summary", "Knowledge gains", "Intent to call 988", "Audiences & communities",
+                "Trends & sessions", "Participant voice", "Data quality & methods"])
+
+# ---- Summary ------------------------------------------------------------------
+with tabs[0]:
+    c = st.columns(5)
+    c[0].metric("Responses", f"{len(df):,}")
+    after = ov.get("Knowledge: % agree after (avg of outcome items)")
+    before = ov.get("Knowledge: % agree before (avg, retrospective)")
+    if not is_blank(after):
+        c[1].metric("Knowledge after training", f"{after:.0f}% agree",
+                    delta=None if is_blank(before) else f"{after - before:+.0f} pts vs. before",
+                    help="Average % agreeing with the knowledge statements (identify crises, describe "
+                         "988, know when to use it). 'Before' is the retrospective self-rating.")
+    imp = ov.get("Retro change: % who improved on average")
+    if not is_blank(imp):
+        c[2].metric("Rated themselves higher", f"{imp:.0f}%",
+                    help="Share whose average after-rating is above their before-rating.")
+    nps_v = ov.get("Net Promoter Score")
+    c[3].metric("Net Promoter Score", "n<10" if is_blank(nps_v) else f"{nps_v:+.0f}",
+                help="% scoring 9-10 minus % scoring 0-6 on 'How likely are you to recommend…'. "
+                     "Ranges from -100 to +100.")
+    c[3].caption(f"n = {n_txt(ov.get('Recommend: n answered'))}")
+    p988 = ov.get("Likely to call 988: % likely")
+    c[4].metric("Likely to call 988", "n<10" if is_blank(p988) else f"{p988:.0f}%",
+                help=(f"Scored {C.CALL_988_LIKELY_MIN_0_10}-10 on the 0-10 question. "
+                      if res.call_988_scale == "0-10" else "Likely or very likely. ")
+                + "Only some respondents answered this question.")
+    c[4].caption(f"n = {n_txt(ov.get('Likely to call 988: n answered'))}")
+
+    st.subheader("What the data says")
+    bullets = insights.build(res, tables, themes, label=lbl)
+    st.markdown("\n".join(f"- {b}" for b in bullets) if bullets else "_Not enough data in this view._")
+    st.caption("Generated automatically from the tables in this dashboard, so it updates with new data "
+               "and with your filters. Every statement uses only groups of at least "
+               f"{C.MIN_N} people.")
+
+    left, right = st.columns(2)
+    rc = tables["retro_change"]
+    if not rc.empty and (~rc["suppressed"]).any():
+        r = rc[~rc["suppressed"]].assign(item_label=lambda d: d["item"].map(lbl))
+        long = r.melt(id_vars=["item_label", "n"], value_vars=["top_box_before", "top_box_after"],
+                      var_name="when", value_name="pct")
+        long["when"] = long["when"].map({"top_box_before": "Before", "top_box_after": "After"})
+        with left:
+            st.markdown("**% who agree, before vs. after the training**")
+            show(grouped_hbar(long, "pct", "item_label", "when", {"Before": ORANGE, "After": BLUE},
+                              title="% agree or strongly agree", domain=[0, 100], suffix="%",
+                              tooltip=["item_label", "when", alt.Tooltip("pct:Q", format=".1f"), "n"]))
+    if "nps_group" in df and "audience" in df:
+        nps_rows = []
+        for aud, g in df.groupby("audience", observed=True):
+            s = g["nps_group"].dropna()
+            if len(s) >= C.MIN_N and aud != NOT_REPORTED:
+                for cat, k in zip(["Detractor", "Passive", "Promoter"], list(NPS_COLORS)):
+                    nps_rows.append({"audience": f"{aud} (n={len(s):,})", "category": k,
+                                     "pct": (s == cat).mean() * 100})
+        if nps_rows:
+            nd = pd.DataFrame(nps_rows)
+            with right:
+                st.markdown("**Would they recommend the training? (0-10)**")
+                chart = alt.Chart(nd).mark_bar().encode(
+                    x=alt.X("pct:Q", stack="normalize", title="% of respondents", axis=alt.Axis(format="%")),
+                    y=alt.Y("audience:N", title=None),
+                    color=alt.Color("category:N", title=None, sort=list(NPS_COLORS),
+                                    scale=alt.Scale(domain=list(NPS_COLORS), range=list(NPS_COLORS.values())),
+                                    legend=alt.Legend(orient="top")),
+                    order=alt.Order("category:N", sort="ascending"),
+                    tooltip=["audience", "category", alt.Tooltip("pct:Q", format=".1f", title="%")]
+                ).properties(height=alt.Step(40))
+                show(chart)
+
+# ---- Knowledge gains ----------------------------------------------------------------
+with tabs[1]:
+    st.markdown("Did participants feel more knowledgeable after the training? Each person rated "
+                "each statement for *after* and, looking back, for *before* the training.")
+    rc = tables["retro_change"]
     if rc.empty:
-        st.info("No retrospective (before/after) item pairs were detected. "
-                "Check the Data quality tab and RETRO_PAIR_OVERRIDES in src/config.py.")
+        st.info("No before/after question pairs were found in this file (see Data quality & methods).")
     else:
-        st.caption("Retrospective design: respondents rated themselves *before* the training "
-                   "after it ended. Only people who answered both halves of a pair are included.")
-        shown = rc[~rc["suppressed"]].assign(label=lambda d: d["item"].map(lbl))
-        if shown.empty:
-            st.info(f"Fewer than {C.MIN_N} people in this view answered both halves of any pair.")
+        split = st.toggle("Compare students and adults", value=False, key="k_split")
+        if split and "audience" in df:
+            parts = []
+            for aud, g in df.groupby("audience", observed=True):
+                if aud == NOT_REPORTED:
+                    continue
+                t = analyze.retro_change(res, g)
+                t = t[~t["suppressed"]]
+                if len(t):
+                    parts.append(t.assign(audience=aud))
+            if parts:
+                t = pd.concat(parts)
+                t["item_label"] = t["item"].map(lbl)
+                long = t.melt(id_vars=["item_label", "audience", "n"],
+                              value_vars=["top_box_before", "top_box_after"], var_name="when", value_name="pct")
+                long["series"] = long["audience"] + " · " + long["when"].map(
+                    {"top_box_before": "before", "top_box_after": "after"})
+                colors = {"Students · before": "#b1a8ec", "Students · after": AUDIENCE_COLORS["Students"],
+                          "Adults · before": "#9fdcc4", "Adults · after": AUDIENCE_COLORS["Adults"]}
+                show(grouped_hbar(long, "pct", "item_label", "series", colors, title="% agree",
+                                  domain=[0, 100], suffix="%",
+                                  tooltip=["item_label", "series", alt.Tooltip("pct:Q", format=".1f"), "n"]))
         else:
-            st.subheader("Average self-rating, before vs. after")
-            long = shown.melt(id_vars=["label", "question_after", "n"],
-                              value_vars=["before_mean", "after_mean"],
-                              var_name="when", value_name="mean")
-            long["when"] = long["when"].map({"before_mean": "Before", "after_mean": "After"})
-            chart = (alt.Chart(long).mark_bar(cornerRadiusEnd=4)
-                     .encode(x=alt.X("mean:Q", title="Mean (1 = strongly disagree, 5 = strongly agree)",
-                                     scale=alt.Scale(domain=[1, 5])),
-                             y=alt.Y("label:N", title=None),
-                             yOffset=alt.YOffset("when:N", sort=["Before", "After"]),
-                             color=alt.Color("when:N", sort=["Before", "After"], title=None,
-                                             scale=alt.Scale(domain=["Before", "After"],
-                                                             range=[ORANGE, BLUE]),
-                                             legend=alt.Legend(orient="top")),
-                             tooltip=[alt.Tooltip("question_after:N", title="question"), "when",
-                                      alt.Tooltip("mean:Q", format=".2f"), "n"])
-                     .properties(height=alt.Step(18)))
-            st.altair_chart(chart, width="stretch")
+            r = rc[~rc["suppressed"]].assign(item_label=lambda d: d["item"].map(lbl))
+            long = r.melt(id_vars=["item_label", "n"], value_vars=["top_box_before", "top_box_after"],
+                          var_name="when", value_name="pct")
+            long["when"] = long["when"].map({"top_box_before": "Before", "top_box_after": "After"})
+            show(grouped_hbar(long, "pct", "item_label", "when", {"Before": ORANGE, "After": BLUE},
+                              title="% agree or strongly agree", domain=[0, 100], suffix="%",
+                              tooltip=["item_label", "when", alt.Tooltip("pct:Q", format=".1f"), "n"]))
+        st.markdown("**How individuals moved**")
+        r = rc[~rc["suppressed"]].assign(item_label=lambda d: d["item"].map(lbl))
+        mv = r.melt(id_vars=["item_label", "n"], value_vars=["pct_improved", "pct_same", "pct_declined"],
+                    var_name="move", value_name="pct")
+        mv["move"] = mv["move"].map({"pct_improved": "Rated higher", "pct_same": "Same",
+                                     "pct_declined": "Rated lower"})
+        show(alt.Chart(mv).mark_bar().encode(
+            x=alt.X("pct:Q", stack="normalize", title="% of people", axis=alt.Axis(format="%")),
+            y=alt.Y("item_label:N", title=None, axis=alt.Axis(labelLimit=360)),
+            color=alt.Color("move:N", title=None, sort=["Rated higher", "Same", "Rated lower"],
+                            scale=alt.Scale(domain=["Rated higher", "Same", "Rated lower"],
+                                            range=[BLUE, GRAY, ORANGE]), legend=alt.Legend(orient="top")),
+            order=alt.Order("move:N"),
+            tooltip=["item_label", "move", alt.Tooltip("pct:Q", format=".1f", title="%"), "n"],
+        ).properties(height=alt.Step(36)))
+        ce = tables.get("ceiling", pd.DataFrame())
+        if not ce.empty:
+            ce_txt = ", ".join(f"{lbl(r_['item'])}: {r_['pct_at_5_before']:.0f}%" for _, r_ in ce.iterrows()
+                               if not is_blank(r_["pct_at_5_before"]))
+            st.caption(f"Already at the top (5) before the training, so they could not rate higher: {ce_txt}.")
+        st.markdown("**Detail table**")
+        show_cols = {"item": "Item", "n": "n", "top_box_before": "% agree before", "top_box_after": "% agree after",
+                     "before_mean": "Mean before (1-5)", "after_mean": "Mean after (1-5)", "change": "Mean change",
+                     "pct_improved": "% rated higher", "pct_declined": "% rated lower", "wilcoxon_p": "Wilcoxon p"}
+        t = analyze.safe_table(rc)[list(show_cols)].rename(columns=show_cols)
+        t["Item"] = rc["item"].map(lbl)
+        t["Wilcoxon p"] = rc["wilcoxon_p"].map(p_text)
+        st.dataframe(t, hide_index=True, width="stretch")
+        st.caption("Wilcoxon signed-rank test: is the before → after change larger than chance? "
+                   "Self-reported and retrospective, so it measures perceived learning, not a test score.")
 
-            st.subheader("% who rated themselves higher after than before")
-            st.altair_chart(bar(shown, "pct_improved", "label",
-                                [alt.Tooltip("question_after:N", title="question"),
-                                 alt.Tooltip("pct_improved:Q", format=".1f", title="% improved"),
-                                 alt.Tooltip("pct_same:Q", format=".1f", title="% same"),
-                                 alt.Tooltip("pct_declined:Q", format=".1f", title="% lower"), "n"],
-                                x_title="% improved", y_title=None, domain=[0, 100]),
-                            width="stretch")
-            st.caption("People already at 5 before the training cannot improve on that item.")
-        n_hidden = int(rc["suppressed"].sum())
-        if n_hidden:
-            st.caption(f"{n_hidden} item(s) hidden because n < {C.MIN_N}.")
-        st.dataframe(hide_small_counts(rc.drop(columns=["item"])), hide_index=True, width="stretch")
-
-# --------------------------------------------------------------------------- #
-# By group
-# --------------------------------------------------------------------------- #
-METRIC_NAMES = {"recommend_mean": "Recommend: mean (0-10)", "nps": "Net Promoter Score",
-                "pct_likely_988": "% likely to call 988",
-                "retro_change_mean": "Avg. change, before → after (pts)"}
-METRIC_N = {"recommend_mean": "n_recommend", "nps": "n_recommend",
-            "pct_likely_988": "n_988", "retro_change_mean": "n_retro"}
-
-with tab_group:
-    g1, g2 = st.columns(2)
-    group = g1.selectbox("Group by", ["county", "role", "language"])
-    tbl = group_tbls[group]
-    if tbl.empty:
-        st.info(f"No {group} column was detected.")
+# ---- Intent to call 988 ----------------------------------------------------------------
+with tabs[2]:
+    if "call_988" not in df:
+        st.info("This file has no 'likely to call 988' question.")
     else:
-        metric_cols = [c for c in tbl.columns
-                       if c not in ("group", "n", "suppressed") and not c.startswith("n_")]
-        nice = {c: (f"% agree: {lbl(c.removeprefix('pct_agree_'))}" if c.startswith("pct_agree_")
-                    else METRIC_NAMES.get(c, c)) for c in metric_cols}
-        by_name = {v: k for k, v in nice.items()}
-        metric = by_name[g2.selectbox("Metric", list(by_name))]
-        n_col = (f"n_agree_{metric.removeprefix('pct_agree_')}" if metric.startswith("pct_agree_")
-                 else METRIC_N.get(metric))
-        if n_col not in tbl:
-            n_col = "n"
-        visible = tbl[~tbl["suppressed"] & tbl[metric].notna()]
-        if visible.empty:
-            st.info(f"No {group} has at least {C.MIN_N} people who answered this question.")
+        n988 = int(df["call_988"].notna().sum())
+        st.markdown(f"**{n988:,} of {len(df):,}** respondents in this view ({n988 / len(df) * 100:.0f}%) answered "
+                    "*How likely are you to call 988 if you or someone else is experiencing a mental health "
+                    "challenge or crisis?* All results here describe only those people.")
+        if n988 < C.MIN_N:
+            st.warning(f"Fewer than {C.MIN_N} people answered, so results are hidden.")
         else:
-            st.altair_chart(bar(visible, metric, "group",
-                                ["group", alt.Tooltip(f"{metric}:Q", format=".2f", title=nice[metric]),
-                                 alt.Tooltip(f"{n_col}:Q", title="n answered"),
-                                 alt.Tooltip("n:Q", title="n in group")],
-                                x_title=nice[metric], y_title=None), width="stretch")
-        n_small_grp = int(tbl["suppressed"].sum())
-        n_small_metric = int((~tbl["suppressed"] & tbl[metric].isna()).sum())
-        notes = []
-        if n_small_grp:
-            notes.append(f"{n_small_grp} group(s) hidden because the group has n < {C.MIN_N}")
-        if n_small_metric:
-            notes.append(f"{n_small_metric} more hidden because fewer than {C.MIN_N} "
-                         "in the group answered this question")
-        if notes:
-            st.caption("; ".join(notes) + ".")
-        st.caption(f"Bars use only people who answered this question (`{n_col}` in the table).")
+            left, right = st.columns(2)
+            with left:
+                st.markdown("**How likely are they to call?**")
+                if res.call_988_scale == "0-10":
+                    bands = pd.cut(df["call_988"].astype(float), [-0.1, 4, 6, 8, 10],
+                                   labels=["0-4 (unlikely)", "5-6", "7-8", "9-10 (very likely)"])
+                    rows = []
+                    for aud, g in df.assign(band=bands).groupby("audience", observed=True):
+                        s = g["band"].dropna()
+                        if len(s) >= C.MIN_N and aud != NOT_REPORTED:
+                            for b, k in s.value_counts().items():
+                                rows.append({"audience": f"{aud} (n={len(s)})", "band": str(b),
+                                             "pct": k / len(s) * 100, "k": k})
+                    bd = pd.DataFrame(rows)
+                    if len(bd):
+                        order = ["0-4 (unlikely)", "5-6", "7-8", "9-10 (very likely)"]
+                        show(alt.Chart(bd).mark_bar().encode(
+                            x=alt.X("pct:Q", stack="normalize", title="% of those who answered",
+                                    axis=alt.Axis(format="%")),
+                            y=alt.Y("audience:N", title=None),
+                            color=alt.Color("band:N", title="Score", sort=order,
+                                            scale=alt.Scale(domain=order,
+                                                            range=["#cde2fb", "#86b6ef", "#3987e5", "#184f95"]),
+                                            legend=alt.Legend(orient="top")),
+                            order=alt.Order("band:N"),
+                            tooltip=["audience", "band", alt.Tooltip("pct:Q", format=".1f", title="%")],
+                        ).properties(height=alt.Step(40)))
+                st.caption(f"'Likely' = {C.CALL_988_LIKELY_MIN_0_10}-10. Audiences with fewer than "
+                           f"{C.MIN_N} answers are not shown.")
+            with right:
+                st.markdown("**Does knowing more go with being more likely to call?**")
+                ig = tables["intent_gap"]
+                if not ig.empty:
+                    ig = ig.assign(item_label=ig["item"].map(lbl))
+                    shown = ig[ig["pct_likely_988"].notna()]
+                    show(grouped_hbar(shown, "pct_likely_988", "item_label", "knowledge",
+                                      {"Does not agree (1-3)": ORANGE, "Agrees (4-5)": BLUE},
+                                      title="% likely to call 988", domain=[0, 100], suffix="%",
+                                      tooltip=["item_label", "knowledge", alt.Tooltip("pct_likely_988:Q", format=".1f"),
+                                               "n"]))
+                    rho = ig.drop_duplicates("item")[["item_label", "spearman_rho", "spearman_p"]]
+                    st.caption("Correlation between each knowledge rating and the 988 score (Spearman's rho): "
+                               + "; ".join(f"{r_.item_label}: {r_.spearman_rho:.2f} ({p_text(r_.spearman_p)})"
+                                           for r_ in rho.itertuples() if not is_blank(r_.spearman_rho))
+                               + ". Groups with fewer than 10 people are hidden.")
+            st.markdown("**Who answered this question?**")
+            sub = tables.get("subset_988", pd.DataFrame())
+            if not sub.empty:
+                st.dataframe(analyze.safe_table(sub), hide_index=True, width="stretch")
+                st.caption("Compares people who answered the 988 question with everyone else (Mann-Whitney p). "
+                           "If they differ, 988 results may not represent all participants.")
+
+# ---- Audiences & communities -------------------------------------------------------------
+METRICS = {"nps": ("Net Promoter Score", "n_recommend", "+.0f", [-100, 100]),
+           "recommend_mean": ("Recommend: mean (0-10)", "n_recommend", ".1f", [0, 10]),
+           "pct_likely_988": ("% likely to call 988", "n_988", ".0f", [0, 100]),
+           "retro_change_mean": ("Avg. before → after change (points)", "n_retro", ".2f", None)}
+for col in res.likert_cols:
+    METRICS[f"pct_agree_{col}"] = (f"% agree: {lbl(col)}", f"n_agree_{col}", ".0f", [0, 100])
+
+with tabs[3]:
+    g1, g2, g3 = st.columns([1, 2, 1])
+    # Options are display labels mapped back to keys (no format_func: works on every Streamlit version)
+    GROUP_LABELS = {"Audience (students vs adults)": "audience", "County": "county", "Role": "role",
+                    "Survey language": "language"}
+    group = GROUP_LABELS[g1.selectbox("Compare by", list(GROUP_LABELS))]
+    metric_by_label = {v[0]: k for k, v in METRICS.items()}
+    metric = metric_by_label[g2.selectbox("Measure", list(metric_by_label))]
+    can_split = group in ("county", "language")
+    split = g3.toggle("Split by audience", value=False, disabled=not can_split,
+                      help="Shows students and adults separately inside each group. Useful because "
+                           "groups differ a lot in their share of students.") if can_split else False
+    name, n_col, fmt, dom = METRICS[metric]
+    tbl = analyze.by_group(res, group, df, split="audience" if split else None)
+    if tbl.empty or metric not in tbl:
+        st.info("This grouping isn't available in the current data.")
+    else:
+        vis = tbl[~tbl["suppressed"] & tbl[metric].notna()]
+        if group == "audience":
+            vis = vis[vis["group"] != NOT_REPORTED]
+        if vis.empty:
+            st.info(f"No group has at least {C.MIN_N} people who answered this question.")
+        elif split:
+            vis = vis[vis["split"].isin(AUDIENCE_COLORS)]
+            show(grouped_hbar(vis, metric, "group", "split", AUDIENCE_COLORS, title=name, domain=dom, fmt=fmt,
+                              tooltip=["group", "split", alt.Tooltip(f"{metric}:Q", format=fmt, title=name),
+                                       alt.Tooltip(f"{n_col}:Q", title="n answered")]))
+        else:
+            show(hbar(vis, metric, "group", title=name, domain=dom, fmt=fmt,
+                      color_map=AUDIENCE_COLORS if group == "audience" else None,
+                      tooltip=["group", alt.Tooltip(f"{metric}:Q", format=fmt, title=name),
+                               alt.Tooltip(f"{n_col}:Q", title="n answered"), alt.Tooltip("n:Q", title="n in group")]))
+        hidden = len(tbl) - len(vis)
+        if hidden:
+            st.caption(f"{hidden} group(s) not shown: fewer than {C.MIN_N} people in the group, or "
+                       f"fewer than {C.MIN_N} answered this question.")
         if group == "role":
-            st.caption("Respondents who chose several roles are counted in each.")
-        display = hide_small_counts(tbl)
-        st.dataframe(display.rename(columns=nice), hide_index=True, width="stretch")
+            st.caption("People who chose several roles count in each.")
+        tests = analyze.group_tests(res, group, df)
+        if not tests.empty:
+            st.markdown("**Are these differences bigger than chance?**")
+            tt = tests[["metric", "groups_compared", "n", "test", "p_value", "effect", "verdict"]].copy()
+            tt["p_value"] = tt["p_value"].map(p_text)
+            st.dataframe(tt.rename(columns={"metric": "Measure", "groups_compared": "Groups compared",
+                                            "test": "Test", "p_value": "p", "effect": "Effect size",
+                                            "verdict": "Plain-language verdict"}),
+                         hide_index=True, width="stretch")
+            st.caption("Rank-based tests (Mann-Whitney for 2 groups, Kruskal-Wallis for 3+). Effect size tells "
+                       "you whether a real difference is also a *meaningful* one. Differences describe, they "
+                       "don't explain: groups also differ in who attends (see 'Split by audience').")
+        with st.expander("Full table"):
+            st.dataframe(analyze.safe_table(tbl), hide_index=True, width="stretch")
 
-# --------------------------------------------------------------------------- #
-# Open-text themes
-# --------------------------------------------------------------------------- #
-with tab_text:
-    if not res.text_cols:
-        st.info("No open-text columns were detected.")
-    st.caption("Keyword-based coding (src/text_themes.py). One response can match several "
-               "themes. Validate by hand-reading a sample before quoting any number.")
-    for col, th in theme_tbls.items():
+# ---- Trends & sessions --------------------------------------------------------------------
+TREND_METRICS = {"nps": ("Net Promoter Score", [-100, 100]),
+                 "pct_agree_after": ("% agree after (knowledge items)", [0, 100]),
+                 "retro_change_mean": ("Avg. before → after change (points)", None),
+                 "pct_delivery": ("% agree: delivery (presenter / organization)", [0, 100]),
+                 "pct_likely_988": ("% likely to call 988", [0, 100]),
+                 "recommend_mean": ("Recommend: mean (0-10)", [0, 10])}
+with tabs[4]:
+    t1, t2 = st.columns([1, 2])
+    period = t1.radio("Period", ["Quarter", "Month"], horizontal=True)
+    trend_by_label = {v[0]: k for k, v in TREND_METRICS.items()}
+    tmetric = trend_by_label[t2.selectbox("Measure", list(trend_by_label), key="trend_measure")]
+    pcode = "Q" if period == "Quarter" else "M"
+    overall_tr = analyze.trend(res, df, period=pcode).assign(audience="All")
+    by_aud = analyze.trend(res, df, period=pcode, by="audience")
+    tr = pd.concat([overall_tr, by_aud[by_aud["audience"].isin(AUDIENCE_COLORS)]], ignore_index=True)
+    tr = tr[~tr["suppressed"] & tr[tmetric].notna()]
+    if tr.empty:
+        st.info("Not enough dated responses for a trend.")
+    else:
+        show(lines(tr, "period", tmetric, "audience", {"All": "#52514e", **AUDIENCE_COLORS},
+                   title=TREND_METRICS[tmetric][0], domain=TREND_METRICS[tmetric][1],
+                   tooltip=["period", "audience", alt.Tooltip(f"{tmetric}:Q", format=".1f"), "n",
+                            alt.Tooltip("pct_students:Q", format=".0f", title="% students")]))
+        st.caption(f"Periods with fewer than {C.MIN_N} responses (per line) are not plotted. "
+                   "When the 'All' line moves, check whether the audience mix changed too.")
+
+    st.subheader("Session scorecard")
+    ses = tables["sessions"]
+    st.markdown(f"One row per training session (training date × county) with at least {C.MIN_N} responses. "
+                f"A session is **flagged** if its Net Promoter Score is below {C.SESSION_ALERT_NPS_BELOW}, "
+                f"knowledge agreement after training is below {C.SESSION_ALERT_AGREE_BELOW:.0f}%, or delivery "
+                f"agreement is below {C.SESSION_ALERT_DELIVERY_BELOW:.0f}% (thresholds in `src/config.py`).")
+    if ses.empty:
+        st.info(f"No session has {C.MIN_N}+ responses in this view.")
+    else:
+        only = st.toggle("Show only flagged sessions", value=False)
+        v = ses[ses["needs_follow_up"]] if only else ses
+        st.dataframe(
+            analyze.safe_table(v)[["date", "county", "n", "pct_students", "nps", "pct_agree_after",
+                                   "retro_change_mean", "pct_delivery", "n_988", "pct_likely_988", "flags"]],
+            hide_index=True, width="stretch",
+            column_config={
+                "date": st.column_config.DateColumn("Date", format="MMM D, YYYY"),
+                "county": "County", "n": "Responses",
+                "pct_students": st.column_config.NumberColumn("% students", format="%.0f%%"),
+                "nps": st.column_config.NumberColumn("NPS", format="%+.0f"),
+                "pct_agree_after": st.column_config.NumberColumn("% agree after", format="%.0f%%"),
+                "retro_change_mean": st.column_config.NumberColumn("Change (pts)", format="%+.2f"),
+                "pct_delivery": st.column_config.NumberColumn("Delivery % agree", format="%.0f%%"),
+                "n_988": "n (988 Q)",
+                "pct_likely_988": st.column_config.NumberColumn("% likely 988", format="%.0f%%"),
+                "flags": "Follow-up flags"})
+        a = ses.attrs
+        st.caption(f"{int(ses['needs_follow_up'].sum())} of {len(ses)} sessions flagged. "
+                   f"{a.get('hidden_sessions', 0)} smaller sessions ({a.get('hidden_responses', 0)} responses) "
+                   f"are not listed individually but are included in every other view. "
+                   "Use flags as a prompt to talk with the facilitator, not as a verdict.")
+
+# ---- Participant voice --------------------------------------------------------------------
+with tabs[5]:
+    st.markdown("Themes in the two open-ended questions, coded with transparent keyword rules "
+                "(`src/text_themes.py`). One answer can mention several themes. Individual answers are "
+                "never shown, to protect participants.")
+    vsplit = st.toggle("Compare students and adults", value=False, key="v_split")
+    for col in res.text_cols:
         st.subheader(res.label(col))
-        n_ans = int(th["n_answered"].iloc[0]) if len(th) else 0
-        if n_ans < C.MIN_N:
+        th = themes.get(col)
+        if th is None or th.empty or int(th["n_answered"].iloc[0]) < C.MIN_N:
             st.info(f"Fewer than {C.MIN_N} people in this view answered this question.")
             continue
-        shown_th = th[~th["under_min_n"]]
-        if len(shown_th):
-            st.altair_chart(bar(shown_th, "pct_of_answered", "theme",
-                                ["theme", "count",
-                                 alt.Tooltip("pct_of_answered:Q", format=".1f", title="% of answered")],
-                                x_title="% of people who answered", y_title=None),
-                            width="stretch")
+        if vsplit:
+            tb = themes.get(f"{col}_by_audience", pd.DataFrame())
+            tb = tb[tb["group"].isin(AUDIENCE_COLORS) & tb["pct_of_answered"].notna()] if not tb.empty else tb
+            if tb.empty:
+                st.info("Not enough answers to split by audience.")
+                continue
+            order = th["theme"].tolist()
+            show(grouped_hbar(tb, "pct_of_answered", "theme", "group", AUDIENCE_COLORS, sort=order,
+                              title="% of people who answered", suffix="%",
+                              tooltip=["theme", "group", "count", alt.Tooltip("pct_of_answered:Q", format=".1f")]))
+        else:
+            shown = th[~th["under_min_n"]]
+            show(hbar(shown, "pct_of_answered", "theme", title="% of people who answered", suffix="%",
+                      sort=shown["theme"].tolist(),
+                      tooltip=["theme", "count", alt.Tooltip("pct_of_answered:Q", format=".1f")]))
         n_hidden = int(th["under_min_n"].sum())
-        st.caption(f"{n_ans:,} people answered."
-                   + (f" {n_hidden} theme(s) with fewer than {C.MIN_N} mentions hidden."
-                      if n_hidden else ""))
+        st.caption(f"{int(th['n_answered'].iloc[0]):,} people answered."
+                   + (f" {n_hidden} theme(s) with fewer than {C.MIN_N} mentions not shown." if n_hidden else ""))
+    with st.expander("How are themes assigned? (keyword rules)"):
+        for col in res.text_cols:
+            st.markdown(f"**{res.label(col)}**")
+            for theme, pats in text_themes.THEMES_BY_COLUMN.get(col, text_themes.ALL_THEMES).items():
+                st.markdown(f"- *{theme}*: `" + "`, `".join(pats[:6]) + ("`, …" if len(pats) > 6 else "`"))
+        st.caption("Patterns are regular expressions. To add a theme or keyword, edit src/text_themes.py and "
+                   "check accuracy with scripts/validate_themes.py (see README).")
 
-# --------------------------------------------------------------------------- #
-# Data quality
-# --------------------------------------------------------------------------- #
-with tab_quality:
-    st.markdown("How the raw file was interpreted. **Check the column detection and "
-                "retrospective pairs** before trusting any result.")
-    st.code("\n".join(res.report), language=None)
+# ---- Data quality & methods ------------------------------------------------------------
+with tabs[6]:
+    st.markdown("**Data-quality checks** for the current view")
+    st.dataframe(tables["quality"], hide_index=True, width="stretch")
+    sens = tables.get("sensitivity", pd.DataFrame())
+    if not sens.empty:
+        st.markdown("**Robustness:** do the before → after results hold without people who gave the same "
+                    "answer to every question?")
+        s2 = analyze.safe_table(sens).assign(item=sens["item"].map(lbl))
+        st.dataframe(s2[["sample", "item", "n", "top_box_before", "top_box_after", "change"]].rename(
+            columns={"sample": "Sample", "item": "Item", "top_box_before": "% agree before",
+                     "top_box_after": "% agree after", "change": "Mean change"}), hide_index=True, width="stretch")
+    with st.expander("How the file was read (column detection and cleaning report)"):
+        st.code("\n".join(res.report), language=None)
+    methods = ROOT / "docs" / "METHODS.md"
+    if methods.exists():
+        with st.expander("Methods and definitions"):
+            st.markdown(methods.read_text(encoding="utf-8"))
+
 
 # --------------------------------------------------------------------------- #
 # Download: aggregate tables only (never row-level data or open text)
 # --------------------------------------------------------------------------- #
-def summary_zip() -> bytes:
-    tables = {"overall.csv": overall_safe(ov_tbl)}
-    if not rc.empty:
-        tables["retro_change.csv"] = hide_small_counts(rc)
-    for g, t in group_tbls.items():
-        if not t.empty:
-            tables[f"by_{g}.csv"] = hide_small_counts(t)
-    for col, th in theme_tbls.items():
-        if len(th) and int(th["n_answered"].iloc[0]) >= C.MIN_N:
-            tables[f"themes_{col}.csv"] = th[~th["under_min_n"]].drop(columns="under_min_n")
+def build_download() -> bytes:
+    safe = analyze.safe_tables({**tables, **{f"themes_{k}": v for k, v in themes.items()}})
+    xlsx = io.BytesIO()
+    analyze.write_excel(safe, xlsx)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
-        for name, t in tables.items():
-            z.writestr(name, t.to_csv(index=False))
+        z.writestr("summary_report.xlsx", xlsx.getvalue())
+        for name, t in safe.items():
+            z.writestr(f"csv/{name}.csv", t.to_csv(index=False))
+        z.writestr("README.txt",
+                   "Aggregate tables from the 988 Training Insights dashboard for the filters that were "
+                   f"active when downloaded. Counts below {C.MIN_N} are shown as '{SMALL}' and those "
+                   "groups' results are blank. No individual responses are included.\n"
+                   "Definitions: docs/METHODS.md in the project folder.\n")
     return buf.getvalue()
 
 
 st.sidebar.download_button(
-    "Download summary tables (CSV)", data=summary_zip(), file_name="summary_tables.zip",
-    mime="application/zip",
-    help=f"Aggregate tables for the current filters only. Groups and counts under {C.MIN_N} "
-         "are hidden. No individual responses are included.")
+    "Download summary (Excel + CSV)",
+    data=build_download(),
+    file_name="988_training_summary.zip", mime="application/zip",
+    help=f"Aggregate tables for the current filters. Counts under {C.MIN_N} are hidden. "
+         "No individual responses are included. Good for grant reports.")

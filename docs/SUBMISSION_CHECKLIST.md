@@ -3,6 +3,10 @@
 **Due: Sunday, November 8, 2026, 9:00 AM ET.** The single source for the deliverables list.
 Technical-artifact steps: [../TODO/10_submission.md](../TODO/10_submission.md).
 
+**Build everything:** `python scripts/build_deliverables.py --team N --forbid "Name One,Name Two"`
+→ `submission/TeamN_Memo.pdf`, `TeamN_AIAppendix.pdf`, `TeamN_TechnicalArtifact.zip`, with page-limit,
+placeholder, name/e-mail and no-data checks. The deck and the demo video are made by hand.
+
 Replace `#` with our team number. Before uploading, check that no file name,
 slide, document property or video frame contains a personal name (judging is anonymous).
 

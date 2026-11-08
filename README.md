@@ -1,125 +1,155 @@
-# BuildFest 2026: 988 Training Survey Analysis
+# 988 Training Insights
 
-This repo analyzes the EveryMind 988 training survey: about 1,300 responses with
-language, role, county, six Likert items, three retrospective "before the
-training" items, a 0–10 recommend score, likelihood of calling 988, and two
-open-text questions.
+A free, local dashboard and analysis pipeline that turns EveryMind's **988 awareness training
+survey** (the Microsoft Forms export) into the answers program staff need:
 
-> **The data is confidential and is never committed.** See [data/README.md](data/README.md).
-> Judging is anonymous, so no personal names go anywhere in this repo.
-> See [CONTRIBUTING.md](CONTRIBUTING.md).
+- **Is the training working?** Knowledge before vs. after, with significance tests.
+- **Will people act?** Likelihood to call 988, and how it relates to what they learned.
+- **For whom does it work less well?** Students vs. adults, counties, roles, language, with
+  small groups protected.
+- **Is quality holding up?** Quarterly and monthly trends, plus a **session scorecard** that
+  flags trainings for follow-up.
+- **What do participants say?** Themes in the two open-ended questions.
 
-**New here?** Do the setup below, then open [TODO/00_START_HERE.md](TODO/00_START_HERE.md):
-it has the data dictionary and one task file per project stage. Using an AI assistant?
-It must follow [AGENTS.md](AGENTS.md).
+Every number is an aggregate. Any group based on fewer than **10** people is hidden, and no
+individual response is ever shown or exported. A new survey export works with **no code
+changes**: drop it in, or upload it in the dashboard.
 
-## Repo layout
+> **Confidential data:** the survey file never leaves your computer and is never committed
+> to git (see [data/README.md](data/README.md)).
 
-```
-app.py                  Streamlit dashboard (reads whatever .xlsx is in data/)
-src/config.py           Settings: small-group threshold, scales, column overrides
-src/clean.py            Load + clean the survey, write a cleaning report
-src/analyze.py          Before/after change; results by county, role, language
-src/text_themes.py      Keyword theme coding of the two open-text questions
-scripts/verify_pipeline.py  Checks the pipeline works on the data (prints no results)
-scripts/make_fake_data.py   Generates FAKE data (same layout as the real file) for testing
-TODO/                   Step-by-step task files for each project stage (human- and AI-readable)
-data/                   Put the .xlsx here (gitignored)
-outputs/                Generated tables and reports (gitignored)
-notebooks/              Scratch analysis (clear outputs before committing; see notebooks/README.md)
-docs/                   Deliverable drafts: memo, AI appendix, deck outline, AI log, submission checklist
-AGENTS.md, CLAUDE.md    Rules for AI coding tools
-.githooks/pre-commit    Blocks data files from being committed
-```
+---
 
-## 1. Setup (once)
+## Quick start (EveryMind staff, no coding)
 
-You need Python 3.11 or newer. Check with `python3 --version`.
+1. **Install Python** (one time): from [python.org/downloads](https://www.python.org/downloads/),
+   version 3.9 or newer. On Windows, tick **"Add python.exe to PATH"** during install.
+2. **Get this folder** onto your computer (download the zip and unzip it).
+3. **Put the survey export in the `data/` folder** (see [Updating the data](#updating-the-data)).
+   You can also skip this and upload the file in the dashboard.
+4. **Double-click the launcher:**
+   - macOS: `start_dashboard.command` (first time: right-click → Open → Open, to allow it)
+   - Windows: `start_dashboard.bat`
 
-**macOS / Linux**
+   The first run installs everything (2–5 minutes). After that it opens in seconds. The
+   dashboard opens in your browser at http://localhost:8501. Close the black terminal
+   window to stop it.
+
+## Quick start (command line)
+
 ```bash
-git clone <repo-url>
-cd buildfest2026
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-git config core.hooksPath .githooks   # turns on the data-leak guard
-```
-
-**Windows (PowerShell)**
-```powershell
-git clone <repo-url>
-cd buildfest2026
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-git config core.hooksPath .githooks
-```
-
-Then copy `BuildFest_EveryMind_Survey_Data_FULL.xlsx` into `data/`.
-
-Activate the environment (`source .venv/bin/activate`) every time you open a new terminal.
-
-## 2. Verify, then run the cleaning
-
-Run every command from the repo root. First confirm the pipeline understands the file.
-This prints only PASS/WARN/FAIL checks, column headers and counts, never results:
-
-```bash
-python scripts/verify_pipeline.py
-```
-
-Expected on the current file: **0 FAIL**, with WARNs only for the known items listed in
-[TODO/02_cleaning_and_validation.md](TODO/02_cleaning_and_validation.md). Then:
-
-```bash
-python -m src.clean          # clean + write outputs/cleaning_report.md
-python -m src.analyze        # write outputs/overall.csv, retro_change.csv, by_*.csv
-python -m src.text_themes    # write outputs/themes_text_valuable.csv, themes_text_improve.csv
-```
-
-**Read the cleaning report the first time you run it.** It shows which column was
-detected as what, and which "before" item was paired with which "after" item.
-If something is wrong, pin it in [src/config.py](src/config.py) with
-`COLUMN_OVERRIDES` or `RETRO_PAIR_OVERRIDES`, then rerun.
-
-Console output contains only counts and column headers, never individual responses.
-
-## 3. Run the dashboard
-
-```bash
 streamlit run app.py
 ```
 
-It opens at http://localhost:8501. The dashboard reads the newest `.xlsx` in `data/`
-and reloads when that file changes, so an updated export needs no code changes.
+Tested on Python 3.9 and 3.14 (macOS); runs anywhere Python and a web browser run.
 
-## Testing without the real data
+## Updating the data
 
-```bash
-python scripts/make_fake_data.py
-DATA_FILE=outputs/FAKE_survey.xlsx python -m src.analyze
-DATA_FILE=outputs/FAKE_survey.xlsx streamlit run app.py
+1. In Microsoft Forms, open the survey → **Responses** → **Open results in Excel**, and save
+   the `.xlsx`. Don't edit it: the tool cleans it.
+2. Either save it into `data/` (the newest `.xlsx` there is used), or click **Use a different
+   survey export** in the dashboard sidebar.
+3. Check **Data quality & methods → How the file was read** after each new export. It lists
+   which column was recognized as what.
+
+**If the form changes** (a question is reworded, added or removed), detection usually still
+works. If a column is misread, pin it in `src/config.py` → `COLUMN_OVERRIDES`, then run
+`python scripts/verify_pipeline.py` to confirm (0 FAIL). See the troubleshooting table below.
+
+## Using the dashboard
+
+The **sidebar** has filters (audience, language, county, role, training dates) and
+**Download summary (Excel + CSV)**: privacy-safe tables for grant reports and board updates.
+
+| Tab | Answers | Look for |
+|---|---|---|
+| **Summary** | The headline results in five numbers, plus auto-written takeaways | "What the data says" updates itself for new data and filters |
+| **Knowledge gains** | Did self-rated knowledge rise on each statement? | Before vs. after % agree; % who rated themselves higher; ceiling note |
+| **Intent to call 988** | How likely are people to call, and does knowledge relate to intent? | The gap between those who do and don't agree they know when to use 988 |
+| **Audiences & communities** | Where does the training land less well? | Turn on **Split by audience** before comparing counties; read the plain-language test verdicts |
+| **Trends & sessions** | Is quality stable over time? Which sessions need follow-up? | Session scorecard flags (thresholds in `src/config.py`) |
+| **Participant voice** | What did people value, and what would they change? | Compare students vs. adults |
+| **Data quality & methods** | Can the numbers be trusted? | Quality checks, robustness table, cleaning report, definitions |
+
+**Suggested routine:** run it monthly (or after each batch of trainings). Review the session
+scorecard with facilitators, and use the quarterly Summary + download for reporting. It takes
+about 15 minutes per month.
+
+## Command-line tools
+
+| Command | What it does |
+|---|---|
+| `python -m src.analyze` | Writes every result table to `outputs/` plus a shareable `outputs/summary_report.xlsx` (counts < 10 hidden) |
+| `python -m src.text_themes` | Writes theme tables for the open-ended questions |
+| `python scripts/verify_pipeline.py` | Checks the pipeline understands a (new) file. Prints structure only, never results |
+| `python scripts/crosscheck.py` | Recomputes 12 headline numbers with independent code and compares them |
+| `python scripts/validate_themes.py sample` / `score` | Blind human check of the theme coder (see below) |
+| `python scripts/make_fake_data.py` | Creates a FAKE file with the same layout, for demos and testing |
+| `python -m pytest -q` | 21 automated tests on fake data (`pip install -r requirements-dev.txt` first) |
+| `python scripts/build_deliverables.py --team N` | Builds the BuildFest PDFs and artifact zip with checks |
+
+Run them from this folder with the environment active. Add `--file path/to/file.xlsx` to the
+scripts, or set `DATA_FILE=...`, to use a specific file.
+
+### Checking the open-ended themes
+
+1. `python scripts/validate_themes.py sample` writes `outputs/theme_validation.xlsx`: 50
+   random answers per question, without the coder's labels.
+2. A staff member marks 1 under each theme that applies. Do this locally, and never paste
+   answers into AI tools.
+3. `python scripts/validate_themes.py score` reports agreement, precision and recall per theme.
+   Improve weak rules in `src/text_themes.py` and repeat.
+
+## Settings (`src/config.py`)
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `MIN_N` | 10 | Small-group privacy threshold |
+| `CALL_988_LIKELY_MIN_0_10` | 7 | "Likely to call 988" = score of 7 or more |
+| `NONSTANDARD_AGREE_LABELS` | `{}` | Map odd labels (e.g. "Very agree") instead of treating them as missing |
+| `YOUTH_ROLE_KEYWORDS` | student | Which roles count as the Students audience |
+| `SESSION_ALERT_*` | NPS < 0, knowledge < 85%, delivery < 80% | Session scorecard flags |
+| `TREND_PERIOD` | Q | Quarter (Q) or month (M) for exported trend tables |
+| `COUNTY_ALIASES`, `COLUMN_OVERRIDES`, `RETRO_PAIR_OVERRIDES` | empty | Manual fixes if a new export is read wrongly |
+| `SHORT_LABELS` | knowledge/delivery items | Chart labels only |
+
+Full definitions and statistical methods: [docs/METHODS.md](docs/METHODS.md).
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| "No survey file found" | Put the `.xlsx` in `data/` or upload it in the sidebar |
+| "This file could not be read" | Use the original Forms export (.xlsx, one sheet). Re-export if it was edited |
+| A chart or group is missing | It has fewer than 10 responses in the current view. Remove a filter |
+| A column looks wrong after a form change | Run `python scripts/verify_pipeline.py`, then set `COLUMN_OVERRIDES` in `src/config.py` |
+| macOS says the launcher "can't be opened" | Right-click `start_dashboard.command` → Open → Open |
+| Port 8501 busy | `streamlit run app.py --server.port 8502` |
+
+## Project structure
+
+```
+app.py                      The dashboard
+start_dashboard.command/.bat One-click launchers (macOS / Windows)
+src/config.py               All settings and team decisions
+src/clean.py                Load + clean any export (column detection, scales, dates, counties, audience)
+src/analyze.py              All measures, group tests, trends, intent gap, session scorecard, quality checks, safe export
+src/text_themes.py          Open-ended theme rules + coding
+src/insights.py             Plain-language takeaways for the Summary tab
+scripts/                    verify_pipeline, crosscheck, validate_themes, make_fake_data, build_deliverables
+tests/                      Automated tests (fake data only)
+docs/                       METHODS.md, memo.md, ai_appendix.md, AI_LOG.md, deck_outline.md, SUBMISSION_CHECKLIST.md
+TODO/                       Team task files per project stage (start with 00_START_HERE.md)
+data/                       Put the survey export here (gitignored)
+outputs/                    Generated tables (gitignored)
 ```
 
-On Windows PowerShell, set the variable first: `$env:DATA_FILE="outputs/FAKE_survey.xlsx"`.
+## For contributors
 
-## Method notes
-
-| Topic | Rule |
-|---|---|
-| Likert → numbers | Strongly disagree = 1 … Strongly agree = 5. "% agree" = Agree + Strongly agree. Spanish labels included. |
-| 988 likelihood | In the current file this is a **0–10** scale answered by only ~23% of respondents (added to the form later). "% likely" = score ≥ 7 (`CALL_988_LIKELY_MIN_0_10`). Always report its own n. Label scales (Very unlikely … Very likely) are also supported. |
-| Recommend | 0–10. NPS = % 9–10 minus % 0–6. |
-| Before/after | Retrospective pre-test: "before" and "after" are both reported after the training. Change = after − before, using only people who answered both. Wilcoxon signed-rank p-value included. |
-| Missing | Blank, "None", "N/A" and similar become missing. Every statistic reports its own n. Two non-standard labels on the training-aspect items ("Very agree", "Satisfied") are excluded by default (see `src/config.py`). |
-| Small groups | Groups with **n < 10** are suppressed (values hidden, `suppressed = True`). Within a group, each metric is also blanked if fewer than 10 people answered *that* question (`n_recommend`, `n_988`, `n_retro` columns). County and language values with < 10 responses are folded into "Other (n<10)". |
-| Roles | Multi-select. A respondent who picked two roles counts in both role groups. |
-| Text themes | Keyword rules, multi-label. A first pass only: validate by hand before quoting. |
-
-Change thresholds in [src/config.py](src/config.py), not in the scripts.
-
-## Deliverables
-
-See [docs/SUBMISSION_CHECKLIST.md](docs/SUBMISSION_CHECKLIST.md). Log AI use as you go in
-[docs/AI_LOG.md](docs/AI_LOG.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) (branch per task, PRs into `main`, no data or names in
+commits) and turn on the data-leak guard once per clone: `git config core.hooksPath .githooks`.
+AI assistants must follow [AGENTS.md](AGENTS.md). Team task files are in
+[TODO/00_START_HERE.md](TODO/00_START_HERE.md).

@@ -1,5 +1,12 @@
 # Stage 04: Open-Text Theme Coding
 
+> **Status (2026-11-08): rules rebuilt, human validation still to do.** Themes were rewritten from
+> privacy-safe word counts (dictionary words in 10+ answers) into two sets, `VALUABLE` and `IMPROVE` in
+> `src/text_themes.py`. Uncoded is now ~30% for both questions (was 50% / 80%). **Remaining human task:**
+> `python scripts/validate_themes.py sample`, hand-code the 50 answers per question locally, then
+> `python scripts/validate_themes.py score`, and add the agreement numbers to `docs/ai_appendix.md`.
+> The "Asked a question about 988" theme relies mainly on "?" (177 of the first 226 matches had one).
+
 **Depends on:** 02. **Read first:** [00_START_HERE.md](00_START_HERE.md)
 
 ## Goal

@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import argparse
 import difflib
+import io
 import json
 import os
 import re
@@ -334,13 +335,25 @@ def group_small(series: pd.Series, min_n: int = C.MIN_N) -> pd.Series:
 # --------------------------------------------------------------------------- #
 # Main pipeline
 # --------------------------------------------------------------------------- #
-def load_and_clean(path: str | Path | None = None) -> CleanResult:
-    src = find_data_file(path)
-    raw = pd.read_excel(src, sheet_name=0, dtype=object)
+def load_and_clean(path=None, name: str | None = None) -> CleanResult:
+    """Load and clean a survey export.
+
+    path: a file path, an in-memory file (bytes / BytesIO, e.g. a dashboard upload),
+          or None for the newest .xlsx in data/. name: display name for in-memory files.
+    """
+    if isinstance(path, (bytes, bytearray)):
+        path = io.BytesIO(path)
+    if hasattr(path, "read"):  # in-memory upload: never written to disk
+        src_name = name or "uploaded file"
+        raw = pd.read_excel(path, sheet_name=0, dtype=object)
+    else:
+        src = find_data_file(path)
+        src_name = src.name
+        raw = pd.read_excel(src, sheet_name=0, dtype=object)
     report: list[str] = []
     private: list[str] = []
 
-    report.append(f"Source file: {src.name}")
+    report.append(f"Source file: {src_name}")
     report.append(f"Raw shape: {raw.shape[0]} rows x {raw.shape[1]} columns")
 
     raw.columns = [norm_header(c) for c in raw.columns]
@@ -424,6 +437,14 @@ def load_and_clean(path: str | Path | None = None) -> CleanResult:
             lambda v: [p.strip() for p in str(v).split(";") if p.strip()] if pd.notna(v) else []
         )
         report.append(f"Respondents selecting more than one role: {int((out['role_list'].map(len) > 1).sum())}")
+        # Audience: Students vs Adults (definition in config.YOUTH_ROLE_KEYWORDS)
+        is_youth = out["role_list"].map(
+            lambda rs: any(k in r.lower() for r in rs for k in C.YOUTH_ROLE_KEYWORDS))
+        out["audience"] = pd.Series("Adults", index=out.index, dtype="string")
+        out.loc[is_youth, "audience"] = "Students"
+        out.loc[out["role_list"].map(len) == 0, "audience"] = NOT_REPORTED
+        report.append(f"Audience: {int(is_youth.sum())} Students, "
+                      f"{int((out['audience'] == 'Adults').sum())} Adults")
 
     # Recommend -> NPS category
     if "recommend" in out.columns:
@@ -459,7 +480,7 @@ def load_and_clean(path: str | Path | None = None) -> CleanResult:
 
     likert_cols = sorted([c for c in out.columns if c.startswith("outcome_")]) + \
         sorted([c for c in out.columns if c.startswith("aspect_")])
-    return CleanResult(df=out, source_file=src.name, column_map=column_map,
+    return CleanResult(df=out, source_file=src_name, column_map=column_map,
                        likert_cols=likert_cols, retro_pairs=retro_pairs,
                        text_cols=text_cols, call_988_scale=call_988_scale, report=report, private_report=private)
 

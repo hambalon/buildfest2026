@@ -1,5 +1,12 @@
 # Stage 05: Streamlit Dashboard (Technical Artifact)
 
+> **Status (2026-11-08): rebuilt as the final artifact.** 7 tabs (Summary with auto-takeaways, Knowledge
+> gains, Intent to call 988, Audiences & communities, Trends & sessions, Participant voice, Data quality &
+> methods), upload box, date filter, audience split, session scorecard, Excel+CSV download (aggregates only).
+> Tested: every control on Python 3.9 and 3.14, real and fake data, 0 exceptions. **Remaining human
+> task:** one visual pass of the final version in light and dark mode (the earlier review covered the
+> previous version).
+
 **Starting point (2026-11-07):** built; passes an automated smoke test on the real file (0 exceptions,
 all tabs, all group selections). **Nobody has visually reviewed it yet.**
 **Depends on:** 03, 04. **Read first:** [00_START_HERE.md](00_START_HERE.md)
