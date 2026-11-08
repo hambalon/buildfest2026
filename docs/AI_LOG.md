@@ -128,4 +128,7 @@ errors or problems · what we verified manually and how · kept / changed / disc
   two open-text columns only. Both are reported in `cleaning_report.md`.
 - **Effect (verify output):** county 10 → 7 distinct names; text_improve answered 638 → 651.
   `verify_pipeline.py`: 36 pass, 5 warn (known), 0 fail.
-- **Still open:** the 10-row spot-check (Excel vs `survey_clean.csv`); D2 (988 cutoff).
+- **10-row spot-check (human):** after the fixes, rows 5, 100, 250, 400, 550, 700, 850, 1000,
+  1150 and 1290 compared between the raw Excel and `survey_clean.csv` (Likert → number, date,
+  county, roles). All 10 match.
+- **Still open:** D2 (988 cutoff).

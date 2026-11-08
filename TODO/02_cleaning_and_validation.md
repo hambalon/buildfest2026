@@ -45,9 +45,10 @@ converts to the right number, and a human has spot-checked it against the raw Ex
 
 ### Manual checks (human only, on your own machine; never share the rows)
 - [x] Run `python -m src.clean` and read `outputs/cleaning_report.md` end to end.
-- [ ] Open the raw Excel and `outputs/survey_clean.csv` side by side. For **10 random
+- [x] Open the raw Excel and `outputs/survey_clean.csv` side by side. For **10 random
       rows**, check that each Likert label matches its number, the date matches, the
-      county matches, and multi-select roles split correctly.
+      county matches, and multi-select roles split correctly. *(Done 2026-11-07: rows 5, 100,
+      250, 400, 550, 700, 850, 1000, 1150, 1290; all 10 match.)*
 - [x] Confirm the three before/after pairs (`before_01`↔`outcome_01`, etc.) by reading the full question text.
 - [x] Check that the counts of non-missing values per column in Excel (COUNTA) match the
       `missing/unparseable` lines in the report.
@@ -60,7 +61,7 @@ converts to the right number, and a human has spot-checked it against the raw Ex
       `clean.standardize_county`, 10 → 7 names; `COUNTY_ALIASES` in config.py for any others.)*
 - [x] Open-text "None"/"N/A" answers are kept as answers in the text columns
       (`TEXT_ANSWER_TOKENS` in config.py), not dropped as missing.
-- [ ] Record what you checked and what you found in `docs/AI_LOG.md` ("Verified manually").
+- [x] Record what you checked and what you found in `docs/AI_LOG.md` ("Verified manually").
 
 ## Acceptance criteria
 - `verify_pipeline.py`: 0 FAIL, and every WARN has a recorded decision.
